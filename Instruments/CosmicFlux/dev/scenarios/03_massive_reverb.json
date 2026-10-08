@@ -1,0 +1,31 @@
+{
+  "name": "Massive Reverb",
+  "description": "High density, high warp, smooth mode",
+  "duration": 10.0,
+  "static": {
+    "loopstart": 0.2,
+    "loopsize": 0.2,
+    "overlap": 0.2,
+    "speed": 0.3,
+    "pitch": 0.5,
+    "density": 0.85,
+    "window": 0.8,
+    "blend": 0.8,
+    "loopstart_alt": 0.1,
+    "loopsize_alt": 0.5,
+    "overlap_alt": 0.1,
+    "density_alt": 0.85,
+    "window_alt": 0.4,
+    "pitch_alt": 0.25,
+    "blend_alt": 0.0,
+    "freeze": 0,
+    "record": 0,
+    "reset": 0,
+    "file": 0,
+    "source": 0,
+    "freeze_alt": 0,
+    "record_alt": 0,
+    "reset_alt": 0,
+    "file_alt": 1
+  }
+}

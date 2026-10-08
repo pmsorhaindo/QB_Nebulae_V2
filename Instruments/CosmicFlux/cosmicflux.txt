@@ -1,0 +1,154 @@
+-------------------------------------------------
+COSMICFLUX v0.1
+-------------------------------------------------
+CosmicFlux is a multi-stage delay and reverb effect instrument for the 
+Qu-Bit Nebulae V2, inspired by cascaded rack delays and massive reverberant 
+spaces.
+
+Signal flow: Dynamic Flanger → Series Multi-Tap Delay (Moon Net) → 
+             Barberpole Phaser → FDN Reverb/Delay (Massive Net) → Mix/Limiter
+
+-------------------------------------------------
+Features
+-------------------------------------------------
+• MOON NET: 6-stage series multi-tap delay with per-stage modulation and 
+  "dimension" smear control
+• MASSIVE NET: 8-line feedback-delay-network (FDN) reverb with density, warp, 
+  and 4 sonic modes
+• Dynamic flanger with envelope-follower or LFO modulation
+• Dual barberpole phaser with counter-rotating sweeps for stereo width
+• Tap tempo / clock input for Moon delay time
+• Freeze mode for infinite sustain
+• Built-in soft limiter for safe output levels
+
+-------------------------------------------------
+MOON NET (Multi-Tap Delay) Controls
+-------------------------------------------------
+ * Start       - Moon TIME                    ; (12H) Delay time: 10ms to 1200ms (exponential)
+ * Size        - Moon FEEDBACK                ; (12H) Global feedback amount for series delay
+ * Overlap     - Moon DIMENSION               ; (12H) Per-stage "smear" (inner allpass/comb feedback)
+ * Speed       - MULTIPLY (Tap Count)         ; (12H) Number of taps summed to output (1-6)
+ * Reset       - TAP / CLOCK IN               ; (Off) Tap tempo or clock input sets Moon TIME
+ 
+ * Start Alt   - Moon EARLY MOD               ; (Def) Rate+depth for first LFO (cascades through all)
+ * Overlap Alt - Moon LATE MOD                ; (Def) Rate+depth for last LFO (affects late taps)
+ * Size Alt    - Moon FEEDBACK FILTER         ; (Def) Tilt filter: CCW=dark, noon=flat, CW=bright
+ * Blend Alt   - Flanger DEPTH                ; (Def) Dynamic flanger depth (0 = off)
+ * Reset Alt   - Dotted-Eighth Toggle         ; (Def) Multiplies TIME by 1.5x
+ * File        - HALF SPEED                   ; (Off) Multiplies TIME by 0.5x
+ * File Alt    - Flanger MODE                 ; (Def) 0=EnvDown, 1=EnvUp, 2=LFO
+ * Freeze Alt  - Flanger Negative Feedback    ; (Def) Toggle negative feedback (changes notch pattern)
+
+-------------------------------------------------
+MASSIVE NET (FDN Reverb/Delay) Controls
+-------------------------------------------------
+ * Pitch       - Massive DELAY                ; (Def) Longest delay line length (V/oct: hi V = short)
+                                              ;       Range: ~62ms to 2s
+ * Density     - Massive DENSITY              ; (12H) Mixing: 0=sparse (parallel), 1=fully mixed (reverb)
+ * Window      - Massive FEEDBACK             ; (12H) Decay length / feedback amount
+ * Freeze      - INFINITE HOLD                ; (Off) Sets feedback=1.0, mutes input, holds Massive tail
+ 
+ * Pitch Alt   - Massive MODE                 ; (Def) Mode select (0-3):
+                                              ;       0: Sparse Echo (minimal diffusion, fast attack)
+                                              ;       1: Smooth (input diffusion, balanced)
+                                              ;       2: Slow Bloom (long pre-diffusion, slow attack)
+                                              ;       3: Cross-Filtered (L/R cross-feedback with filters)
+ * Density Alt - Massive WARP                 ; (Def) Delay spread: 0%=harmonic/periodic, 100%=reverb
+ * Window Alt  - Massive MOD                  ; (Def) Modulation depth (rate rises with depth; 0=static)
+
+-------------------------------------------------
+Output & Mix Controls
+-------------------------------------------------
+ * Blend       - MIX                          ; (12H) Dry ↔ Wet (equal-power crossfade)
+ * Source      - MUTE INPUT                   ; (Off) Factory default: mutes input (tails ring out)
+ * Record      - PHASER On/Off                ; (Off) Engages dual barberpole phaser
+ * Record Alt  - PHASER SYNC                  ; (Def) Rate: Off=slow (0.1Hz), On=synced to Moon TIME
+
+-------------------------------------------------
+Signal Routing
+-------------------------------------------------
+Input → Flanger → Moon Net (6 series delays) → Phaser → Massive Net (FDN) → Mix → Limiter → Output
+
+Moon Net:
+  - 6 cascaded delay stages, each with its own triangle LFO
+  - Global feedback from stage 6 → stage 1 through tilt filter + saturation
+  - MULTIPLY selects how many taps are mixed to the output with alternating L/R pan
+  - DIMENSION adds inner feedback in each stage for smearing/sustaining
+  
+Massive Net:
+  - 8 delay lines with Householder feedback matrix (orthogonal, energy-preserving)
+  - WARP controls delay length spread (all equal → spread out)
+  - DENSITY controls mixing amount (sparse → fully mixed)
+  - 4 modes with different input diffusion and feedback characteristics
+  - Multi-phase sine modulation (depth scales with 1/rate for pitch stability)
+
+-------------------------------------------------
+Tips & Tricks
+-------------------------------------------------
+• Start with DIMENSION and both MOD controls at zero, then add gradually
+• MULTIPLY at 1-2 gives rhythmic patterns; 4-6 gives smeared, reverb-like textures
+• Freeze mode: set DENSITY high, WARP mid-to-high, MOD to 0, then hit Freeze
+• For infinite tails without Freeze: set Window near max, Density high, Warp mid
+• Tap tempo: tap Reset button 2-4 times to set Moon TIME
+• Clock input: patch a clock into Reset gate input (rising edge triggered)
+• Slow Bloom mode (mode 2) + high Feedback = gradual fade-in reverb build
+• Cross-Filtered mode (mode 3) + mid Density = evolving stereo movement
+• Phaser synced to TIME (Record Alt on) creates rhythmic phase sweeps
+• Flanger Env modes respond to input dynamics (great with percussive material)
+
+-------------------------------------------------
+CPU & Performance Notes
+-------------------------------------------------
+CosmicFlux v0.1 is designed to run on Raspberry Pi 3 (Cortex-A53) at:
+  - sr = 48000 Hz
+  - ksmps = 64 samples
+  - Buffer = 1024 samples
+
+Estimated CPU usage: ~60-70% of one core on Pi 3 (conservative settings)
+  
+If you experience audio glitches (xruns):
+  - Reduce DIMENSION (less inner feedback computation)
+  - Lower MULTIPLY to 3-4 taps
+  - Use mode 0 (Sparse Echo) instead of mode 2 (Slow Bloom)
+
+Silent tails with Feedback < max will decay naturally. The instrument includes 
+denormal protection and DC blocking to prevent CPU runaway on silent passages.
+
+-------------------------------------------------
+Installation
+-------------------------------------------------
+1. Copy cosmicflux.instr to the root of your USB drive
+2. Insert USB drive into Nebulae V2
+3. Hold FILE button and press SOURCE to reload instrument bank
+4. Hold SPEED encoder for ~3 seconds
+5. Turn SPEED encoder counter-clockwise to select User bank (green LED)
+6. Press the button corresponding to the instrument slot
+7. Press SPEED encoder to load
+
+To access the alt layer: hold SOURCE, then adjust any knob or encoder.
+To reset all alt controls to defaults: hold SOURCE, then click PITCH encoder.
+
+-------------------------------------------------
+Credits & License
+-------------------------------------------------
+CosmicFlux v0.1
+Created 2026 for the Qu-Bit Nebulae V2
+Instrument concept: Michael Sorhaindo
+
+Inspired by the published behavior of the Meris Polymoon pedal and the 
+Valhalla Supermassive plugin, but this is an original instrument with 
+original algorithms, names, and design. No product code, presets, or 
+proprietary algorithms were used.
+
+DSP techniques based on public literature:
+  - FDN reverb: Jot & Chaigne, "Digital Delay Networks" (AES 1991)
+  - Delay-line interpolation: Laakso et al., "Splitting the Unit Delay" (1996)
+  - Barberpole phasing: Esqueda, Välimäki, Parker, "Barberpole Phasing and 
+    Flanging Illusions" (DAFx 2015)
+  - Schroeder allpass: Schroeder, "Natural Sounding Artificial Reverberation" 
+    (JAES 1962)
+
+Csound opcodes: inch, flanger, phaser2, deltap3, delayr, delayw, allpass, 
+follow2, lfo, tone, atone, tanh, dcblock2, denorm, clip, portk
+
+Have fun exploring cosmic soundscapes!

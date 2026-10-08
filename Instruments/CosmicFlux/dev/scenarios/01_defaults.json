@@ -1,0 +1,31 @@
+{
+  "name": "Default Settings",
+  "description": "All controls at default/neutral positions",
+  "duration": 5.0,
+  "static": {
+    "loopstart": 0.5,
+    "loopsize": 0.5,
+    "overlap": 0.5,
+    "speed": 0.5,
+    "pitch": 0.6,
+    "density": 0.5,
+    "window": 0.5,
+    "blend": 0.5,
+    "loopstart_alt": 0.15,
+    "loopsize_alt": 0.5,
+    "overlap_alt": 0.15,
+    "density_alt": 0.6,
+    "window_alt": 0.3,
+    "pitch_alt": 0.0,
+    "blend_alt": 0.0,
+    "freeze": 0,
+    "record": 0,
+    "reset": 0,
+    "file": 0,
+    "source": 0,
+    "freeze_alt": 0,
+    "record_alt": 0,
+    "reset_alt": 0,
+    "file_alt": 1
+  }
+}
