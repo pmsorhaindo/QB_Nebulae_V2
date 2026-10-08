@@ -5,15 +5,15 @@ CosmicFlux is a multi-stage delay and reverb effect instrument for the
 Qu-Bit Nebulae V2, inspired by cascaded rack delays and massive reverberant 
 spaces.
 
-Signal flow: Dynamic Flanger → Series Multi-Tap Delay (Moon Net) → 
-             Barberpole Phaser → FDN Reverb/Delay (Massive Net) → Mix/Limiter
+Signal flow: Dynamic Flanger → Series Multi-Tap Delay (Flux Chain) → 
+             Barberpole Phaser → FDN Reverb/Delay (Cosmos) → Mix/Limiter
 
 -------------------------------------------------
 Features
 -------------------------------------------------
-• MOON NET: 6-stage series multi-tap delay with per-stage modulation and 
+• FLUX CHAIN: 6-stage series multi-tap delay with per-stage modulation and 
   "dimension" smear control
-• MASSIVE NET: 8-line feedback-delay-network (FDN) reverb with density, warp, 
+• COSMOS: 8-line feedback-delay-network (FDN) reverb with density, warp, 
   and 4 sonic modes
 • Dynamic flanger with envelope-follower or LFO modulation
 • Dual barberpole phaser with counter-rotating sweeps for stereo width
@@ -22,7 +22,7 @@ Features
 • Built-in soft limiter for safe output levels
 
 -------------------------------------------------
-MOON NET (Multi-Tap Delay) Controls
+FLUX CHAIN (Multi-Tap Delay) Controls
 -------------------------------------------------
  * Start       - Moon TIME                    ; (12H) Delay time: 10ms to 1200ms (exponential)
  * Size        - Moon FEEDBACK                ; (12H) Global feedback amount for series delay
@@ -40,7 +40,7 @@ MOON NET (Multi-Tap Delay) Controls
  * Freeze Alt  - Flanger Negative Feedback    ; (Def) Toggle negative feedback (changes notch pattern)
 
 -------------------------------------------------
-MASSIVE NET (FDN Reverb/Delay) Controls
+COSMOS (FDN Reverb/Delay) Controls
 -------------------------------------------------
  * Pitch       - Massive DELAY                ; (Def) Longest delay line length (V/oct: hi V = short)
                                               ;       Range: ~62ms to 2s
@@ -67,15 +67,15 @@ Output & Mix Controls
 -------------------------------------------------
 Signal Routing
 -------------------------------------------------
-Input → Flanger → Moon Net (6 series delays) → Phaser → Massive Net (FDN) → Mix → Limiter → Output
+Input → Flanger → Flux Chain (6 series delays) → Phaser → Cosmos (FDN) → Mix → Limiter → Output
 
-Moon Net:
+Flux Chain:
   - 6 cascaded delay stages, each with its own triangle LFO
   - Global feedback from stage 6 → stage 1 through tilt filter + saturation
   - MULTIPLY selects how many taps are mixed to the output with alternating L/R pan
   - DIMENSION adds inner feedback in each stage for smearing/sustaining
   
-Massive Net:
+Cosmos:
   - 8 delay lines with Householder feedback matrix (orthogonal, energy-preserving)
   - WARP controls delay length spread (all equal → spread out)
   - DENSITY controls mixing amount (sparse → fully mixed)
@@ -89,12 +89,13 @@ Tips & Tricks
 • MULTIPLY at 1-2 gives rhythmic patterns; 4-6 gives smeared, reverb-like textures
 • Freeze mode: set DENSITY high, WARP mid-to-high, MOD to 0, then hit Freeze
 • For infinite tails without Freeze: set Window near max, Density high, Warp mid
-• Tap tempo: tap Reset button 2-4 times to set Moon TIME
+• Tap tempo: tap Reset button 2-4 times to set Flux TIME
 • Clock input: patch a clock into Reset gate input (rising edge triggered)
 • Slow Bloom mode (mode 2) + high Feedback = gradual fade-in reverb build
 • Cross-Filtered mode (mode 3) + mid Density = evolving stereo movement
 • Phaser synced to TIME (Record Alt on) creates rhythmic phase sweeps
 • Flanger Env modes respond to input dynamics (great with percussive material)
+• Listen to example renders in dev/examples/ folder for inspiration
 
 -------------------------------------------------
 CPU & Performance Notes
@@ -148,7 +149,9 @@ DSP techniques based on public literature:
   - Schroeder allpass: Schroeder, "Natural Sounding Artificial Reverberation" 
     (JAES 1962)
 
-Csound opcodes: inch, flanger, phaser2, deltap3, delayr, delayw, allpass, 
-follow2, lfo, tone, atone, tanh, dcblock2, denorm, clip, portk
+Csound opcodes: inch, flanger, phaser1, deltap3, delayr, delayw, alpass, 
+follow2, lfo, oscili, tone, atone, tanh, dcblock2, denorm, clip, portk, scale, limit
+
+Note: Tested with Csound 6.18. Uses standard Csound 6 opcodes only.
 
 Have fun exploring cosmic soundscapes!

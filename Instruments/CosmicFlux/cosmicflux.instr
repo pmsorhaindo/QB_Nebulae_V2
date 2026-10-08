@@ -24,10 +24,10 @@ nebconfigend
  A cosmic delay/reverb effect instrument inspired by cascaded rack delays 
  and massive reverberant spaces.
  
- Signal flow: Dynamic Flanger → Series Multi-Tap Delay (Moon Net) → 
-              Barberpole Phaser → FDN Reverb/Delay (Massive Net) → Mix/Limiter
+ Signal flow: Dynamic Flanger → Series Multi-Tap Delay (Flux Chain) → 
+              Barberpole Phaser → FDN Reverb/Delay (Cosmos) → Mix/Limiter
  
- * MOON NET (Multi-tap Modulated Delay) *
+ * FLUX CHAIN (Multi-tap Modulated Delay) *
  * Start       - Moon TIME (delay time, 10ms - 1.2s)
  * Size        - Moon FEEDBACK (global feedback amount)
  * Overlap     - Moon DIMENSION (per-stage smear/sustain)
@@ -37,7 +37,7 @@ nebconfigend
  * Size Alt    - Moon FEEDBACK FILTER (tilt: dark ← flat → bright)
  * Blend Alt   - Flanger DEPTH (dynamic flanger depth, 0 = off)
  
- * MASSIVE NET (FDN Reverb/Delay) *
+ * COSMOS (FDN Reverb/Delay) *
  * Pitch       - Massive DELAY (longest line, V/oct: hi V = short)
  * Density     - Massive DENSITY (sparse → fully mixed)
  * Window      - Massive FEEDBACK (decay length)
@@ -88,7 +88,7 @@ kFlangerDepth = gkblend_alt
 kTapClock = gkreset
 kFreeze = gkfreeze
 kPhaserOn = gkrecord
-kHalfSpeed = gkfile
+kHalfSpeed = gkfilesel
 kMuteInput = gksource
 
 kDottedEighth = gkreset_alt
@@ -191,7 +191,7 @@ kMoonDelayTime = kMoonTime_port * kTimeMultiplier
 kMoonDelayTime = max(0.01, min(2.0, kMoonDelayTime))
 
 ; ============================================================
-; [B] MOON NET: 6-STAGE SERIES MULTI-TAP DELAY
+; [B] FLUX CHAIN: 6-STAGE SERIES MULTI-TAP DELAY
 ; ============================================================
 
 ; Per-stage delay time (evenly spaced)
@@ -409,33 +409,21 @@ if kPhaserSync == 1 then
     kPhaserRate = 1.0 / kMoonDelayTime
 endif
 
-; Two phase-shifted LFOs for crossfading
-aPhaserLFO1 lfo 1.0, kPhaserRate, 0
-aPhaserLFO2 lfo 1.0, kPhaserRate, 0, 0.5
+; Simplified phaser with k-rate frequency sweep
+kPhaserLFO lfo 1.0, kPhaserRate, 0
+kPhaserFreq = 200 + (kPhaserLFO + 1) * 1900
 
-; Map LFO to phaser center frequency (200 Hz to 4000 Hz)
-aPhaserFreq1 = 200 + (aPhaserLFO1 + 1) * 1900
-aPhaserFreq2 = 200 + (aPhaserLFO2 + 1) * 1900
+; Apply phasers (1st order, 8 stages for stereo sweep)
+; L sweeps up, R sweeps down
+aPhaserL phaser1 aMoonL, kPhaserFreq, 8, 0.7
+aPhaserR phaser1 aMoonR, 4200 - kPhaserFreq, 8, 0.7
 
-; Apply phasers (2nd order, 4 stages)
-aPhaserL1 phaser2 aMoonL, aPhaserFreq1, 0.7, 4, 1, 1
-aPhaserL2 phaser2 aMoonL, aPhaserFreq2, 0.7, 4, 1, 1
-aPhaserR1 phaser2 aMoonR, 4200 - aPhaserFreq1, 0.7, 4, 1, 1
-aPhaserR2 phaser2 aMoonR, 4200 - aPhaserFreq2, 0.7, 4, 1, 1
-
-; Crossfade between the two phasers (raised cosine window)
-aXfade = (aPhaserLFO1 + 1) * 0.5
-aXfade = (1 - cos(aXfade * 3.14159)) * 0.5
-
-aPhaserL = (aPhaserL1 * aXfade) + (aPhaserL2 * (1 - aXfade))
-aPhaserR = (aPhaserR1 * aXfade) + (aPhaserR2 * (1 - aXfade))
-
-; Mix phaser with dry moon signal
+; Mix phaser with dry Flux Chain signal
 aMoonL = (aPhaserL * kPhaserDepth) + (aMoonL * (1 - kPhaserDepth * 0.5))
 aMoonR = (aPhaserR * kPhaserDepth) + (aMoonR * (1 - kPhaserDepth * 0.5))
 
 ; ============================================================
-; [D] MASSIVE NET: 8-LINE FDN REVERB/DELAY
+; [D] COSMOS: 8-LINE FDN REVERB/DELAY
 ; ============================================================
 
 ; Massive delay: V/oct scaled (higher pitch = shorter delay)
@@ -481,14 +469,14 @@ kModDepth_port portk kModDepth, 0.1
 kModRate_port portk kModRate, 0.1
 
 ; Generate 8 phase-offset sine LFOs for modulation
-aModLFO1 lfo kModDepth_port, kModRate_port, 0, 0.0
-aModLFO2 lfo kModDepth_port, kModRate_port, 0, 0.125
-aModLFO3 lfo kModDepth_port, kModRate_port, 0, 0.25
-aModLFO4 lfo kModDepth_port, kModRate_port, 0, 0.375
-aModLFO5 lfo kModDepth_port, kModRate_port, 0, 0.5
-aModLFO6 lfo kModDepth_port, kModRate_port, 0, 0.625
-aModLFO7 lfo kModDepth_port, kModRate_port, 0, 0.75
-aModLFO8 lfo kModDepth_port, kModRate_port, 0, 0.875
+aModLFO1 lfo kModDepth_port, kModRate_port, 0
+aModLFO2 oscili kModDepth_port, kModRate_port, -1, 0.125
+aModLFO3 oscili kModDepth_port, kModRate_port, -1, 0.25
+aModLFO4 oscili kModDepth_port, kModRate_port, -1, 0.375
+aModLFO5 oscili kModDepth_port, kModRate_port, -1, 0.5
+aModLFO6 oscili kModDepth_port, kModRate_port, -1, 0.625
+aModLFO7 oscili kModDepth_port, kModRate_port, -1, 0.75
+aModLFO8 oscili kModDepth_port, kModRate_port, -1, 0.875
 
 ; Input to Massive (muted during freeze)
 kMassiveInput = (kFreeze == 1 ? 0 : 1)
@@ -502,21 +490,21 @@ if kMode == 0 then
     aMassiveInR = aMassiveInR * 0.7
 elseif kMode == 1 then
     ; Mode 1: Smooth (Hadamard input diffusion)
-    ; Simple diffusion: short allpasses
-    aDiff1L allpass aMassiveInL, 0.005, 0.7
-    aDiff1R allpass aMassiveInR, 0.007, 0.7
-    aDiff2L allpass aDiff1L, 0.011, -0.7
-    aDiff2R allpass aDiff1R, 0.013, -0.7
+    ; Simple diffusion: short alpass filters
+    aDiff1L alpass aMassiveInL, 0.5, 0.005
+    aDiff1R alpass aMassiveInR, 0.5, 0.007
+    aDiff2L alpass aDiff1L, 0.5, 0.011
+    aDiff2R alpass aDiff1R, 0.5, 0.013
     aMassiveInL = aDiff2L * 0.7
     aMassiveInR = aDiff2R * 0.7
 elseif kMode == 2 then
     ; Mode 2: Slow Bloom (long series pre-diffusion)
-    aDiff1L allpass aMassiveInL, 0.031, 0.7
-    aDiff1R allpass aMassiveInR, 0.037, 0.7
-    aDiff2L allpass aDiff1L, 0.043, -0.7
-    aDiff2R allpass aDiff1R, 0.047, -0.7
-    aDiff3L allpass aDiff2L, 0.053, 0.7
-    aDiff3R allpass aDiff2R, 0.059, 0.7
+    aDiff1L alpass aMassiveInL, 0.5, 0.031
+    aDiff1R alpass aMassiveInR, 0.5, 0.037
+    aDiff2L alpass aDiff1L, 0.5, 0.043
+    aDiff2R alpass aDiff1R, 0.5, 0.047
+    aDiff3L alpass aDiff2L, 0.5, 0.053
+    aDiff3R alpass aDiff2R, 0.5, 0.059
     aMassiveInL = aDiff3L * 0.5
     aMassiveInR = aDiff3R * 0.5
 else

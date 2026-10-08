@@ -125,7 +125,8 @@ instr 99
             start_val = auto["start"]
             end_val = auto["end"]
             start_time = auto.get("start_time", 0)
-            end_time = auto.get("end_time", p3)
+            dur = scenario.get("duration", 10.0)
+            end_time = auto.get("end_time", dur)
             
             instr += f"    gk{control} linseg {start_val}, {end_time - start_time}, {end_val}\n"
     
@@ -253,7 +254,7 @@ def analyze_output(audio_file, scenario_name):
     peak = np.max(np.abs(audio))
     if peak > 0.95:
         issues.append(f"Peak exceeds 0.95 ({peak:.3f})")
-    elif peak < 0.001:
+    elif peak < 0.001 and "silence" not in scenario_name.lower():
         issues.append(f"Peak too low ({peak:.6f}) - possibly silent")
     
     # Check for clipping (consecutive samples at max)
@@ -300,7 +301,11 @@ def main():
     # Check Csound
     try:
         result = subprocess.run(["csound", "--version"], capture_output=True, text=True)
-        print(f"Csound version: {result.stdout.split()[0]}")
+        version_line = result.stdout.strip().split('\n')[0] if result.stdout else ""
+        if version_line:
+            print(f"Csound: {version_line}")
+        else:
+            print("Csound installed (version detection failed)")
     except FileNotFoundError:
         print("ERROR: Csound not found. Install Csound 6+ and ensure it's in PATH")
         return 1

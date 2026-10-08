@@ -1,2 +1,6 @@
-*.pyc
-.DS_Store
+# Michael's test file (don't commit to repo)
+Instruments/CosmicFlux/dev/test_signals/michael_test.wav
+
+# Test output files (too large, keep only examples)
+Instruments/CosmicFlux/dev/output/
+Instruments/CosmicFlux/dev/__pycache__/
