@@ -315,20 +315,23 @@ def analyze_output(audio_file, scenario_name, input_file=None):
             if abs(rms_ratio_db) > 6:
                 issues.append(f"RMS mismatch: {rms_ratio_db:+.1f} dB from input (expected within ±6 dB)")
     
-    # Check freeze stability if this is a freeze scenario
-    if 'freeze' in scenario_name.lower() and len(rms_per_sec) > 10:
-        # Find where signal settles (after initial transient)
-        settle_idx = 5  # Start checking after 5 seconds
-        if len(rms_per_sec) > settle_idx + 10:
-            settled_rms = rms_per_sec[settle_idx:settle_idx+10]
-            if len(settled_rms) > 0:
-                rms_mean = np.mean(settled_rms)
-                rms_std = np.std(settled_rms)
-                if rms_mean > 0.001:
-                    rms_var_db = 20 * np.log10((rms_mean + rms_std) / (rms_mean - rms_std + 1e-10))
-                    print(f"    Freeze stability: RMS {rms_mean:.4f} ± {rms_std:.4f} ({rms_var_db:.1f} dB variation)")
-                    if rms_var_db > 3:
-                        issues.append(f"Freeze unstable: {rms_var_db:.1f} dB variation (expected < 2 dB)")
+    # Check freeze stability if this is a freeze scenario.
+    # The measurement window must start after the input file has ended,
+    # otherwise the dry path (mix < 100%) and the still-running input leak into
+    # the numbers. The test inputs are at most 10.7 s long, so start at 12 s and
+    # require at least 5 s of frozen tail. Stability is max/min of per-second RMS.
+    if 'freeze' in scenario_name.lower() and 'silence' not in scenario_name.lower():
+        settle_idx = 12
+        if len(rms_per_sec) >= settle_idx + 5:
+            settled_rms = np.array(rms_per_sec[settle_idx:])
+            if settled_rms.min() > 1e-4:
+                rms_var_db = 20 * np.log10(settled_rms.max() / settled_rms.min())
+                print(f"    Freeze stability ({settle_idx}s to {len(rms_per_sec)}s): "
+                      f"RMS {20*np.log10(settled_rms.mean()):.1f} dBFS, max-min {rms_var_db:.2f} dB")
+                if rms_var_db > 2:
+                    issues.append(f"Freeze unstable: {rms_var_db:.1f} dB variation (expected < 2 dB)")
+            else:
+                issues.append("Freeze decayed to silence")
     
     # Report
     if issues:
