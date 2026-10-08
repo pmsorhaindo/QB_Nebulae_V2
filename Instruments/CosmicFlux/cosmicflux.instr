@@ -117,9 +117,9 @@ if kMuteInput == 1 then
     ainr = 0
 endif
 
-; Input scaling (eurorack levels can be hot)
-ainl = ainl * 0.8
-ainr = ainr * 0.8
+; Input scaling (eurorack levels can be hot, but preserve level)
+ainl = ainl * 0.95
+ainr = ainr * 0.95
 
 ; ============================================================
 ; [A] DYNAMIC FLANGER
@@ -409,14 +409,29 @@ if kPhaserSync == 1 then
     kPhaserRate = 1.0 / kMoonDelayTime
 endif
 
-; Simplified phaser with k-rate frequency sweep
-kPhaserLFO lfo 1.0, kPhaserRate, 0
-kPhaserFreq = 200 + (kPhaserLFO + 1) * 1900
+; Dual crossfaded phaser sweeps for barberpole effect
+; Two phase-shifted LFOs at k-rate for phaser2
+kPhaserLFO1 lfo 1.0, kPhaserRate, 0
+kPhaserLFO2 oscili 1.0, kPhaserRate, -1, 0.5
 
-; Apply phasers (1st order, 8 stages for stereo sweep)
-; L sweeps up, R sweeps down
-aPhaserL phaser1 aMoonL, kPhaserFreq, 8, 0.7
-aPhaserR phaser1 aMoonR, 4200 - kPhaserFreq, 8, 0.7
+; Map LFO to phaser center frequency (200 Hz to 4000 Hz)
+kPhaserFreq1 = 200 + (kPhaserLFO1 + 1) * 1900
+kPhaserFreq2 = 200 + (kPhaserLFO2 + 1) * 1900
+
+; Apply phasers (2nd order, 4 stages each)
+; L sweeps up, R sweeps down for counter-rotation
+aPhaserL1 phaser2 aMoonL, kPhaserFreq1, 0.7, 4, 1, 1, 0.7
+aPhaserL2 phaser2 aMoonL, kPhaserFreq2, 0.7, 4, 1, 1, 0.7
+aPhaserR1 phaser2 aMoonR, 4200 - kPhaserFreq1, 0.7, 4, 1, 1, 0.7
+aPhaserR2 phaser2 aMoonR, 4200 - kPhaserFreq2, 0.7, 4, 1, 1, 0.7
+
+; Crossfade between the two phasers (raised cosine window)
+; Use k-rate LFO for crossfade control
+kXfade = (kPhaserLFO1 + 1) * 0.5
+kXfade = (1 - cos(kXfade * 3.14159)) * 0.5
+
+aPhaserL = (aPhaserL1 * a(kXfade)) + (aPhaserL2 * a(1 - kXfade))
+aPhaserR = (aPhaserR1 * a(kXfade)) + (aPhaserR2 * a(1 - kXfade))
 
 ; Mix phaser with dry Flux Chain signal
 aMoonL = (aPhaserL * kPhaserDepth) + (aMoonL * (1 - kPhaserDepth * 0.5))
@@ -450,33 +465,49 @@ kDelayL6 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[5]))
 kDelayL7 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[6]))
 kDelayL8 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[7]))
 
-; Feedback gain (with freeze mode)
+; Feedback gain (with freeze mode - exactly unity for infinite hold)
 kMassiveFeedback_raw = (kFreeze == 1 ? 1.0 : kMassiveFeedback * 0.995)
 kMassiveFeedback_port portk kMassiveFeedback_raw, 0.1
+; In freeze, bypass gain smoothing to hit exactly 1.0
+kMassiveFeedback_actual = (kFreeze == 1 ? 1.0 : kMassiveFeedback_port)
 
 ; Density: mix amount (sparse → fully mixed)
 ; Use Householder matrix with density blend
-kDensity portk kMassiveDensity, 0.1
+; Force to 1.0 in freeze mode to maintain unity gain
+kDensity_raw = (kFreeze == 1 ? 1.0 : kMassiveDensity)
+kDensity portk kDensity_raw, 0.1
 
 ; Mode selection (4 modes for v0)
 kMode = int(kMassiveMode * 3.99)
 
-; Modulation: multi-phase sines
+; Modulation: multi-phase sines (forced to zero in freeze for pitch stability)
 kModDepth_raw scale kMassiveMod, 0.008, 0
 kModDepth = (kFreeze == 1 ? 0 : kModDepth_raw)
-kModRate = (kModDepth > 0 ? sqrt(kModDepth) * 2.0 : 0)
+kModRate = (kFreeze == 1 ? 0 : (kModDepth > 0 ? sqrt(kModDepth) * 2.0 : 0))
+; Smoothing (but snap to zero immediately in freeze)
 kModDepth_port portk kModDepth, 0.1
 kModRate_port portk kModRate, 0.1
 
-; Generate 8 phase-offset sine LFOs for modulation
-aModLFO1 lfo kModDepth_port, kModRate_port, 0
-aModLFO2 oscili kModDepth_port, kModRate_port, -1, 0.125
-aModLFO3 oscili kModDepth_port, kModRate_port, -1, 0.25
-aModLFO4 oscili kModDepth_port, kModRate_port, -1, 0.375
-aModLFO5 oscili kModDepth_port, kModRate_port, -1, 0.5
-aModLFO6 oscili kModDepth_port, kModRate_port, -1, 0.625
-aModLFO7 oscili kModDepth_port, kModRate_port, -1, 0.75
-aModLFO8 oscili kModDepth_port, kModRate_port, -1, 0.875
+; Generate 8 phase-offset sine LFOs for modulation (forced to 0 in freeze)
+if kFreeze == 1 then
+    aModLFO1 = 0
+    aModLFO2 = 0
+    aModLFO3 = 0
+    aModLFO4 = 0
+    aModLFO5 = 0
+    aModLFO6 = 0
+    aModLFO7 = 0
+    aModLFO8 = 0
+else
+    aModLFO1 lfo kModDepth_port, kModRate_port, 0
+    aModLFO2 oscili kModDepth_port, kModRate_port, -1, 0.125
+    aModLFO3 oscili kModDepth_port, kModRate_port, -1, 0.25
+    aModLFO4 oscili kModDepth_port, kModRate_port, -1, 0.375
+    aModLFO5 oscili kModDepth_port, kModRate_port, -1, 0.5
+    aModLFO6 oscili kModDepth_port, kModRate_port, -1, 0.625
+    aModLFO7 oscili kModDepth_port, kModRate_port, -1, 0.75
+    aModLFO8 oscili kModDepth_port, kModRate_port, -1, 0.875
+endif
 
 ; Input to Massive (muted during freeze)
 kMassiveInput = (kFreeze == 1 ? 0 : 1)
@@ -596,31 +627,49 @@ if kMode == 3 then
 endif
 
 ; Apply feedback gain and saturation
-aFDN1 = tanh(aFDN1_mixed * a(kMassiveFeedback_port) * 2) * 0.5
-aFDN2 = tanh(aFDN2_mixed * a(kMassiveFeedback_port) * 2) * 0.5
-aFDN3 = tanh(aFDN3_mixed * a(kMassiveFeedback_port) * 2) * 0.5
-aFDN4 = tanh(aFDN4_mixed * a(kMassiveFeedback_port) * 2) * 0.5
-aFDN5 = tanh(aFDN5_mixed * a(kMassiveFeedback_port) * 2) * 0.5
-aFDN6 = tanh(aFDN6_mixed * a(kMassiveFeedback_port) * 2) * 0.5
-aFDN7 = tanh(aFDN7_mixed * a(kMassiveFeedback_port) * 2) * 0.5
-aFDN8 = tanh(aFDN8_mixed * a(kMassiveFeedback_port) * 2) * 0.5
+; In freeze mode, use exactly unity gain (1.0) with gentle limiting
+; In normal mode, use tanh for soft limiting
+if kFreeze == 1 then
+    ; Freeze: true unity gain loop
+    ; Only limit to prevent numeric overflow, no gain reduction
+    aFDN1 = limit(aFDN1_mixed, -2.0, 2.0)
+    aFDN2 = limit(aFDN2_mixed, -2.0, 2.0)
+    aFDN3 = limit(aFDN3_mixed, -2.0, 2.0)
+    aFDN4 = limit(aFDN4_mixed, -2.0, 2.0)
+    aFDN5 = limit(aFDN5_mixed, -2.0, 2.0)
+    aFDN6 = limit(aFDN6_mixed, -2.0, 2.0)
+    aFDN7 = limit(aFDN7_mixed, -2.0, 2.0)
+    aFDN8 = limit(aFDN8_mixed, -2.0, 2.0)
+else
+    ; Normal: tanh saturation with feedback control
+    aFDN1 = tanh(aFDN1_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN2 = tanh(aFDN2_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN3 = tanh(aFDN3_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN4 = tanh(aFDN4_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN5 = tanh(aFDN5_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN6 = tanh(aFDN6_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN7 = tanh(aFDN7_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN8 = tanh(aFDN8_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+endif
 
-; DC blocking
-aFDN1 dcblock2 aFDN1
-aFDN2 dcblock2 aFDN2
-aFDN3 dcblock2 aFDN3
-aFDN4 dcblock2 aFDN4
-aFDN5 dcblock2 aFDN5
-aFDN6 dcblock2 aFDN6
-aFDN7 dcblock2 aFDN7
-aFDN8 dcblock2 aFDN8
+; DC blocking (bypassed in freeze mode to preserve unity gain)
+if kFreeze == 0 then
+    aFDN1 dcblock2 aFDN1
+    aFDN2 dcblock2 aFDN2
+    aFDN3 dcblock2 aFDN3
+    aFDN4 dcblock2 aFDN4
+    aFDN5 dcblock2 aFDN5
+    aFDN6 dcblock2 aFDN6
+    aFDN7 dcblock2 aFDN7
+    aFDN8 dcblock2 aFDN8
+endif
 
 ; Denorm protection
 denorm aFDN1, aFDN2, aFDN3, aFDN4, aFDN5, aFDN6, aFDN7, aFDN8
 
-; Mix FDN outputs to stereo
-aMassiveL = (aFDN1 + aFDN3 + aFDN5 + aFDN7) * 0.5
-aMassiveR = (aFDN2 + aFDN4 + aFDN6 + aFDN8) * 0.5
+; Mix FDN outputs to stereo (increase gain to match level)
+aMassiveL = (aFDN1 + aFDN3 + aFDN5 + aFDN7) * 1.2
+aMassiveR = (aFDN2 + aFDN4 + aFDN6 + aFDN8) * 1.2
 
 ; Output filtering (one-pole LP/HP outside feedback)
 kCutoffLo = 80
@@ -665,9 +714,9 @@ aOutR = aOutR * kLimiterGain
 aOutL clip aOutL, 2, 0.95
 aOutR clip aOutR, 2, 0.95
 
-; Output gain
-aOutL = aOutL * 0.8
-aOutR = aOutR * 0.8
+; Output gain (increased to compensate for level loss)
+aOutL = aOutL * 1.2
+aOutR = aOutR * 1.2
 
 outs aOutL, aOutR
 

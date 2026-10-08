@@ -130,15 +130,21 @@ instr 99
             
             instr += f"    gk{control} linseg {start_val}, {end_time - start_time}, {end_val}\n"
     
-    # Gates (timed triggers)
+    # Gates (sustained triggers - stay high after first trigger)
     if "gates" in scenario:
         for control, times in scenario["gates"].items():
-            # Create a series of metro triggers
-            instr += f"    ; Gate pulses for {control}\n"
-            for t in times:
-                instr += f"    if (timeinsts() >= {t} && timeinsts() < {t + 0.05}) then\n"
-                instr += f"        gk{control} = 1\n"
-                instr += f"    endif\n"
+            instr += f"    ; Gate toggle for {control}\n"
+            for i, t in enumerate(times):
+                if i == 0:
+                    # First trigger: set to 1 and stay there
+                    instr += f"    if (timeinsts() >= {t} && timeinsts() < {t + 0.05}) then\n"
+                    instr += f"        gk{control} = 1\n"
+                    instr += f"    endif\n"
+                else:
+                    # Subsequent triggers: toggle
+                    instr += f"    if (timeinsts() >= {t} && timeinsts() < {t + 0.05}) then\n"
+                    instr += f"        gk{control} = 1 - gk{control}\n"
+                    instr += f"    endif\n"
     
     instr += "endin\n"
     
@@ -221,7 +227,7 @@ i99 0 {duration}
         if temp_sco.exists():
             temp_sco.unlink()
 
-def analyze_output(audio_file, scenario_name):
+def analyze_output(audio_file, scenario_name, input_file=None):
     """Analyze rendered output for common issues"""
     
     print(f"\n  Analyzing: {scenario_name}")
@@ -235,6 +241,19 @@ def analyze_output(audio_file, scenario_name):
     # Ensure stereo
     if audio.ndim == 1:
         audio = audio.reshape(-1, 1)
+    
+    # Load input for level comparison if provided
+    input_audio = None
+    input_rms = None
+    if input_file and input_file.exists():
+        try:
+            input_audio, input_sr = sf.read(input_file)
+            if input_audio.ndim == 1:
+                input_audio = input_audio.reshape(-1, 1)
+            # Calculate RMS of input
+            input_rms = np.sqrt(np.mean(input_audio**2))
+        except:
+            pass
     
     issues = []
     
@@ -275,11 +294,39 @@ def analyze_output(audio_file, scenario_name):
             rms = np.sqrt(np.mean(chunk**2))
             rms_per_sec.append(rms)
     
+    # Overall RMS
+    overall_rms = np.sqrt(np.mean(audio**2))
+    
     # Print RMS summary
     if len(rms_per_sec) > 0:
         print(f"    RMS per second: {[f'{r:.4f}' for r in rms_per_sec[:10]]}")
         if len(rms_per_sec) > 10:
             print(f"                    (showing first 10 of {len(rms_per_sec)} seconds)")
+        print(f"    Overall RMS: {overall_rms:.4f}")
+    
+    # Check level matching with input if available
+    if input_rms is not None and overall_rms > 0.001:
+        rms_ratio_db = 20 * np.log10(overall_rms / input_rms) if input_rms > 0 else 0
+        print(f"    Input RMS: {input_rms:.4f}, Output RMS: {overall_rms:.4f} ({rms_ratio_db:+.1f} dB)")
+        # For scenarios with 50% mix or higher, expect output within ~3 dB of input
+        if '50' in scenario_name or 'mix' in scenario_name.lower():
+            if abs(rms_ratio_db) > 6:
+                issues.append(f"RMS mismatch: {rms_ratio_db:+.1f} dB from input (expected within ±6 dB)")
+    
+    # Check freeze stability if this is a freeze scenario
+    if 'freeze' in scenario_name.lower() and len(rms_per_sec) > 10:
+        # Find where signal settles (after initial transient)
+        settle_idx = 5  # Start checking after 5 seconds
+        if len(rms_per_sec) > settle_idx + 10:
+            settled_rms = rms_per_sec[settle_idx:settle_idx+10]
+            if len(settled_rms) > 0:
+                rms_mean = np.mean(settled_rms)
+                rms_std = np.std(settled_rms)
+                if rms_mean > 0.001:
+                    rms_var_db = 20 * np.log10((rms_mean + rms_std) / (rms_mean - rms_std + 1e-10))
+                    print(f"    Freeze stability: RMS {rms_mean:.4f} ± {rms_std:.4f} ({rms_var_db:.1f} dB variation)")
+                    if rms_var_db > 3:
+                        issues.append(f"Freeze unstable: {rms_var_db:.1f} dB variation (expected < 2 dB)")
     
     # Report
     if issues:
@@ -352,7 +399,7 @@ def main():
             success = render_scenario(scenario_file, input_file, output_file)
             
             if success and output_file.exists():
-                analysis_ok = analyze_output(output_file, output_name)
+                analysis_ok = analyze_output(output_file, output_name, input_file)
                 results.append((output_name, success and analysis_ok))
             else:
                 results.append((output_name, False))
