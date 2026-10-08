@@ -1,0 +1,38 @@
+{
+  "name": "Multiply Tap Sweep",
+  "description": "Sweep tap count from 1 to 6",
+  "duration": 10.0,
+  "static": {
+    "loopstart": 0.35,
+    "loopsize": 0.6,
+    "overlap": 0.7,
+    "pitch": 0.6,
+    "density": 0.5,
+    "window": 0.5,
+    "blend": 0.75,
+    "loopstart_alt": 0.3,
+    "loopsize_alt": 0.5,
+    "overlap_alt": 0.3,
+    "density_alt": 0.5,
+    "window_alt": 0.2,
+    "pitch_alt": 0.0,
+    "blend_alt": 0.0,
+    "freeze": 0,
+    "record": 0,
+    "reset": 0,
+    "file": 0,
+    "source": 0,
+    "freeze_alt": 0,
+    "record_alt": 0,
+    "reset_alt": 0,
+    "file_alt": 1
+  },
+  "automation": {
+    "speed": {
+      "start": 0.0,
+      "end": 0.99,
+      "start_time": 0,
+      "end_time": 10.0
+    }
+  }
+}

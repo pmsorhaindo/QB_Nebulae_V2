@@ -1,0 +1,796 @@
+nebconfigbegin
+sr,48000
+ksmps,64
+-B,1024
+-b,256
+reset,triggered,rising
+freeze,latching,rising
+record,latching,rising
+file,latching,rising
+pitch_alt,0.0
+start_alt,0.15
+overlap_alt,0.15
+size_alt,0.5
+density_alt,0.6
+window_alt,0.3
+blend_alt,0.0
+file_alt,1
+record_alt,0
+nebconfigend
+
+/****************
+ COSMICFLUX v0.1
+ 
+ A cosmic delay/reverb effect instrument inspired by cascaded rack delays 
+ and massive reverberant spaces.
+ 
+ Signal flow: Dynamic Flanger → Series Multi-Tap Delay (Flux Chain) → 
+              Barberpole Phaser → FDN Reverb/Delay (Cosmos) → Mix/Limiter
+ 
+ * FLUX CHAIN (Multi-tap Modulated Delay) *
+ * Start       - Moon TIME (delay time, 10ms - 1.2s)
+ * Size        - Moon FEEDBACK (global feedback amount)
+ * Overlap     - Moon DIMENSION (per-stage smear/sustain)
+ * Speed       - MULTIPLY (number of taps: 1-6)
+ * Start Alt   - Moon EARLY MOD (rate+depth for first LFO)
+ * Overlap Alt - Moon LATE MOD (rate+depth for last LFO)
+ * Size Alt    - Moon FEEDBACK FILTER (tilt: dark ← flat → bright)
+ * Blend Alt   - Flanger DEPTH (dynamic flanger depth, 0 = off)
+ 
+ * COSMOS (FDN Reverb/Delay) *
+ * Pitch       - Massive DELAY (longest line, V/oct: hi V = short)
+ * Density     - Massive DENSITY (sparse → fully mixed)
+ * Window      - Massive FEEDBACK (decay length)
+ * Density Alt - Massive WARP (0% = harmonic, 100% = reverb)
+ * Window Alt  - Massive MOD (modulation depth, rate rises with depth)
+ * Pitch Alt   - Massive MODE (mode select)
+ 
+ * OUTPUT *
+ * Blend       - MIX (dry ← → wet, equal power)
+ 
+ * BUTTONS *
+ * Reset       - TAP/CLOCK IN (sets Moon time)
+ * Freeze      - INFINITE HOLD (Massive feedback=1, mute input to Massive)
+ * Record      - PHASER on/off
+ * File        - HALF SPEED (for Moon time)
+ * Source      - MUTE INPUT (factory default)
+ * Reset Alt   - Dotted-eighth toggle
+ * Freeze Alt  - Flanger negative feedback
+ * Record Alt  - Phaser sync mode (slow 0.1Hz ↔ synced to TIME)
+ * File Alt    - Flanger mode (0=EnvDown, 1=EnvUp, 2=LFO)
+ 
+****************/
+
+instr 1
+
+; ============================================================
+; INITIALIZATION & CONTROL MAPPING
+; ============================================================
+
+; Remap panel controls to parameters
+kMoonTime = gkloopstart
+kMoonFeedback = gkloopsize
+kMoonDimension = gkoverlap
+kMultiply = gkspeed
+kMassiveDelay = gkpitch
+kMassiveDensity = gkdensity
+kMassiveFeedback = gkwindow
+kMix = gkblend
+
+kMoonEarlyMod = gkloopstart_alt
+kMoonLateMod = gkoverlap_alt
+kMoonFeedbackFilter = gkloopsize_alt
+kMassiveWarp = gkdensity_alt
+kMassiveMod = gkwindow_alt
+kMassiveMode = gkpitch_alt
+kFlangerDepth = gkblend_alt
+
+kTapClock = gkreset
+kFreeze = gkfreeze
+kPhaserOn = gkrecord
+kHalfSpeed = gkfilesel
+kMuteInput = gksource
+
+kDottedEighth = gkreset_alt
+kFlangerNegFB = gkfreeze_alt
+kPhaserSync = gkrecord_alt
+kFlangerMode = gkfile_alt
+
+; Clock timing
+iMaxDelayTime init 3.0
+kClockTime init 0.4
+kClockLast init 0
+kClockInterval init 0.4
+
+; Init variables
+kInit init 10
+
+; ============================================================
+; INPUT
+; ============================================================
+
+ainl, ainr inch 1, 2
+
+; Apply factory Source mute behavior
+if kMuteInput == 1 then
+    ainl = 0
+    ainr = 0
+endif
+
+; Input scaling (eurorack levels can be hot, but preserve level)
+ainl = ainl * 0.95
+ainr = ainr * 0.95
+
+; ============================================================
+; [A] DYNAMIC FLANGER
+; ============================================================
+
+; Envelope follower for dynamic mode
+kFollowAtt = 0.005
+kFollowRel = 0.1
+aFollow follow2 (ainl + ainr) * 0.5, kFollowAtt, kFollowRel
+
+; Map envelope to flanger depth
+; EnvDown: level rises → depth shrinks → notches go down
+; EnvUp: level rises → depth grows → notches go up
+kFlangerMode_int = int(kFlangerMode * 2.99)
+kFollowDepth = k(aFollow)
+
+; Flanger settings
+kFlangerDepth_port portk kFlangerDepth * 0.01, 0.1
+kFlangerLFORate = 0.5
+aFlangerLFO lfo 1.0, kFlangerLFORate, 0
+
+; Compute flanger delay modulation based on mode
+if kFlangerMode_int == 0 then
+    ; Env Down: depth shrinks with level
+    aFlangerMod = (1.0 - a(kFollowDepth)) * a(kFlangerDepth_port)
+elseif kFlangerMode_int == 1 then
+    ; Env Up: depth grows with level
+    aFlangerMod = a(kFollowDepth) * a(kFlangerDepth_port)
+else
+    ; LFO mode
+    aFlangerMod = aFlangerLFO * a(kFlangerDepth_port)
+endif
+
+; Apply flanger (Csound flanger opcode has internal feedback)
+kFlangerFeedback = (kFlangerNegFB == 1 ? -0.7 : 0.7)
+aFlangerL flanger ainl, aFlangerMod, kFlangerFeedback
+aFlangerR flanger ainr, aFlangerMod, kFlangerFeedback
+
+; Blend flanger with dry
+kFlangerMix = (kFlangerDepth_port > 0 ? 0.5 : 0)
+aSignalL = (aFlangerL * kFlangerMix) + (ainl * (1 - kFlangerMix))
+aSignalR = (aFlangerR * kFlangerMix) + (ainr * (1 - kFlangerMix))
+
+; ============================================================
+; CLOCK / TAP TEMPO
+; ============================================================
+
+kClockTrig trigger kTapClock, 0.5, 0
+if kClockTrig == 1 then
+    kNow timeinsts
+    kClockInterval = kNow - kClockLast
+    if kClockInterval > 0.05 && kClockInterval < 3.0 then
+        kClockTime = kClockInterval
+    endif
+    kClockLast = kNow
+endif
+
+; Moon time: exponential scaling 10ms to 1200ms
+kMoonTime_raw scale kMoonTime, 1.19, 0.01
+kMoonTime_exp = kMoonTime_raw ^ 2
+kMoonTime_port portk kMoonTime_exp, 0.2
+
+; Apply half-speed and dotted-eighth
+kTimeMultiplier = (kHalfSpeed == 1 ? 0.5 : 1.0)
+kTimeMultiplier = (kDottedEighth == 1 ? kTimeMultiplier * 1.5 : kTimeMultiplier)
+
+; Final Moon delay time
+kMoonDelayTime = kMoonTime_port * kTimeMultiplier
+kMoonDelayTime = max(0.01, min(2.0, kMoonDelayTime))
+
+; ============================================================
+; [B] FLUX CHAIN: 6-STAGE SERIES MULTI-TAP DELAY
+; ============================================================
+
+; Per-stage delay time (evenly spaced)
+kStageTime = kMoonDelayTime / 6
+
+; Modulation: triangle LFOs with staggered rates
+; Early mod affects stage 1 (and cascades through all)
+; Late mod affects stage 6
+kEarlyModRate scale kMoonEarlyMod, 0.5, 0.01
+kEarlyModDepth = kEarlyModRate * 0.002
+kLateModRate scale kMoonLateMod, 1.0, 0.01
+kLateModDepth = kLateModRate * 0.002
+
+; Generate 6 triangle LFOs
+aLFO1 lfo kEarlyModDepth, kEarlyModRate, 1
+aLFO2 lfo kEarlyModDepth * 0.8, kEarlyModRate * 1.1, 1
+aLFO3 lfo kEarlyModDepth * 0.6, kEarlyModRate * 1.2, 1
+aLFO4 lfo kLateModDepth * 0.6, kLateModRate * 0.9, 1
+aLFO5 lfo kLateModDepth * 0.8, kLateModRate * 1.0, 1
+aLFO6 lfo kLateModDepth, kLateModRate * 1.1, 1
+
+; Dimension: inner allpass gain
+kDimension portk kMoonDimension * 0.8, 0.1
+
+; Feedback filter (tilt)
+kFeedbackFilter portk kMoonFeedbackFilter, 0.1
+kLPAmount = (kFeedbackFilter < 0.5 ? (0.5 - kFeedbackFilter) * 2 : 0)
+kHPAmount = (kFeedbackFilter > 0.5 ? (kFeedbackFilter - 0.5) * 2 : 0)
+
+; Global feedback gain
+kMoonFeedback_port portk kMoonFeedback * 0.98, 0.1
+
+; Series delay network (unrolled for 6 stages)
+; Each stage: input → modulated delay → inner allpass (dimension) → output
+
+; Initialize feedback signals
+aFeedbackL init 0
+aFeedbackR init 0
+
+; Stage 1 (L)
+aDelayTime1L = a(kStageTime) + aLFO1
+aBuf1L delayr 2.0
+aTap1L deltap3 aDelayTime1L
+delayw aSignalL + aFeedbackL
+aStage1L = aTap1L + (aTap1L * a(kDimension) * -1)
+aStage1L = aStage1L / (1 + abs(kDimension))
+
+; Stage 1 (R)
+aDelayTime1R = a(kStageTime) + aLFO1
+aBuf1R delayr 2.0
+aTap1R deltap3 aDelayTime1R
+delayw aSignalR + aFeedbackR
+aStage1R = aTap1R + (aTap1R * a(kDimension) * -1)
+aStage1R = aStage1R / (1 + abs(kDimension))
+
+; Stage 2 (L)
+aDelayTime2L = a(kStageTime) + aLFO2
+aBuf2L delayr 2.0
+aTap2L deltap3 aDelayTime2L
+delayw aStage1L
+aStage2L = aTap2L + (aTap2L * a(kDimension) * -1)
+aStage2L = aStage2L / (1 + abs(kDimension))
+
+; Stage 2 (R)
+aDelayTime2R = a(kStageTime) + aLFO2
+aBuf2R delayr 2.0
+aTap2R deltap3 aDelayTime2R
+delayw aStage1R
+aStage2R = aTap2R + (aTap2R * a(kDimension) * -1)
+aStage2R = aStage2R / (1 + abs(kDimension))
+
+; Stage 3 (L)
+aDelayTime3L = a(kStageTime) + aLFO3
+aBuf3L delayr 2.0
+aTap3L deltap3 aDelayTime3L
+delayw aStage2L
+aStage3L = aTap3L + (aTap3L * a(kDimension) * -1)
+aStage3L = aStage3L / (1 + abs(kDimension))
+
+; Stage 3 (R)
+aDelayTime3R = a(kStageTime) + aLFO3
+aBuf3R delayr 2.0
+aTap3R deltap3 aDelayTime3R
+delayw aStage2R
+aStage3R = aTap3R + (aTap3R * a(kDimension) * -1)
+aStage3R = aStage3R / (1 + abs(kDimension))
+
+; Stage 4 (L)
+aDelayTime4L = a(kStageTime) + aLFO4
+aBuf4L delayr 2.0
+aTap4L deltap3 aDelayTime4L
+delayw aStage3L
+aStage4L = aTap4L + (aTap4L * a(kDimension) * -1)
+aStage4L = aStage4L / (1 + abs(kDimension))
+
+; Stage 4 (R)
+aDelayTime4R = a(kStageTime) + aLFO4
+aBuf4R delayr 2.0
+aTap4R deltap3 aDelayTime4R
+delayw aStage3R
+aStage4R = aTap4R + (aTap4R * a(kDimension) * -1)
+aStage4R = aStage4R / (1 + abs(kDimension))
+
+; Stage 5 (L)
+aDelayTime5L = a(kStageTime) + aLFO5
+aBuf5L delayr 2.0
+aTap5L deltap3 aDelayTime5L
+delayw aStage4L
+aStage5L = aTap5L + (aTap5L * a(kDimension) * -1)
+aStage5L = aStage5L / (1 + abs(kDimension))
+
+; Stage 5 (R)
+aDelayTime5R = a(kStageTime) + aLFO5
+aBuf5R delayr 2.0
+aTap5R deltap3 aDelayTime5R
+delayw aStage4R
+aStage5R = aTap5R + (aTap5R * a(kDimension) * -1)
+aStage5R = aStage5R / (1 + abs(kDimension))
+
+; Stage 6 (L)
+aDelayTime6L = a(kStageTime) + aLFO6
+aBuf6L delayr 2.0
+aTap6L deltap3 aDelayTime6L
+delayw aStage5L
+aStage6L = aTap6L + (aTap6L * a(kDimension) * -1)
+aStage6L = aStage6L / (1 + abs(kDimension))
+
+; Stage 6 (R)
+aDelayTime6R = a(kStageTime) + aLFO6
+aBuf6R delayr 2.0
+aTap6R deltap3 aDelayTime6R
+delayw aStage5R
+aStage6R = aTap6R + (aTap6R * a(kDimension) * -1)
+aStage6R = aStage6R / (1 + abs(kDimension))
+
+; Apply feedback filter and tanh saturation
+aFeedback6L = aStage6L
+aFeedback6R = aStage6R
+
+; Tilt filter: blend of lowpass and highpass
+if kLPAmount > 0 then
+    aFeedback6L tone aFeedback6L, 2000 + (kLPAmount * 8000)
+    aFeedback6R tone aFeedback6R, 2000 + (kLPAmount * 8000)
+endif
+if kHPAmount > 0 then
+    aFeedback6L atone aFeedback6L, 200 + (kHPAmount * 1000)
+    aFeedback6R atone aFeedback6R, 200 + (kHPAmount * 1000)
+endif
+
+; Saturation and DC blocking
+aFeedback6L = tanh(aFeedback6L * 2) * 0.5
+aFeedback6R = tanh(aFeedback6R * 2) * 0.5
+aFeedback6L dcblock2 aFeedback6L
+aFeedback6R dcblock2 aFeedback6R
+
+; Close the feedback loop
+aFeedbackL = aFeedback6L * a(kMoonFeedback_port)
+aFeedbackR = aFeedback6R * a(kMoonFeedback_port)
+
+; Multiply: mix taps based on control (1-6 taps)
+kMultiply_scaled scale kMultiply, 5.99, 0
+kMultiply_int = int(kMultiply_scaled) + 1
+kMultiply_port portk kMultiply_int, 0.05
+
+; Pan pattern: alternating L/R
+; Auto-scale level by number of taps
+kTapGain = 1.0 / sqrt(kMultiply_port)
+
+; Build tap mix (simple approach: just use the first N stages)
+aMoonL = 0
+aMoonR = 0
+
+if kMultiply_port >= 1 then
+    aMoonL = aMoonL + (aStage1L * 0.7)
+    aMoonR = aMoonR + (aStage1R * 0.3)
+endif
+if kMultiply_port >= 2 then
+    aMoonL = aMoonL + (aStage2L * 0.3)
+    aMoonR = aMoonR + (aStage2R * 0.7)
+endif
+if kMultiply_port >= 3 then
+    aMoonL = aMoonL + (aStage3L * 0.6)
+    aMoonR = aMoonR + (aStage3R * 0.4)
+endif
+if kMultiply_port >= 4 then
+    aMoonL = aMoonL + (aStage4L * 0.4)
+    aMoonR = aMoonR + (aStage4R * 0.6)
+endif
+if kMultiply_port >= 5 then
+    aMoonL = aMoonL + (aStage5L * 0.5)
+    aMoonR = aMoonR + (aStage5R * 0.5)
+endif
+if kMultiply_port >= 6 then
+    aMoonL = aMoonL + (aStage6L * 0.5)
+    aMoonR = aMoonR + (aStage6R * 0.5)
+endif
+
+aMoonL = aMoonL * kTapGain
+aMoonR = aMoonR * kTapGain
+
+; ============================================================
+; [C] DUAL BARBERPOLE PHASER
+; ============================================================
+
+; Simplified barberpole: two staggered phaser2 sweeps with crossfades
+; L sweeps up, R sweeps down
+
+kPhaserOn_port portk kPhaserOn, 0.05
+kPhaserDepth = kPhaserOn_port * 0.8
+
+; Phaser rate
+kPhaserRate = 0.1
+if kPhaserSync == 1 then
+    ; Synced to TIME (quarter note)
+    kPhaserRate = 1.0 / kMoonDelayTime
+endif
+
+; Dual crossfaded phaser sweeps for barberpole effect
+; Two phase-shifted LFOs at k-rate for phaser2
+kPhaserLFO1 lfo 1.0, kPhaserRate, 0
+kPhaserLFO2 oscili 1.0, kPhaserRate, -1, 0.5
+
+; Map LFO to phaser center frequency (200 Hz to 4000 Hz)
+kPhaserFreq1 = 200 + (kPhaserLFO1 + 1) * 1900
+kPhaserFreq2 = 200 + (kPhaserLFO2 + 1) * 1900
+
+; Apply phasers (2nd order, 4 stages each)
+; L sweeps up, R sweeps down for counter-rotation
+aPhaserL1 phaser2 aMoonL, kPhaserFreq1, 0.7, 4, 1, 1, 0.7
+aPhaserL2 phaser2 aMoonL, kPhaserFreq2, 0.7, 4, 1, 1, 0.7
+aPhaserR1 phaser2 aMoonR, 4200 - kPhaserFreq1, 0.7, 4, 1, 1, 0.7
+aPhaserR2 phaser2 aMoonR, 4200 - kPhaserFreq2, 0.7, 4, 1, 1, 0.7
+
+; Crossfade between the two phasers (raised cosine window)
+; Use k-rate LFO for crossfade control
+kXfade = (kPhaserLFO1 + 1) * 0.5
+kXfade = (1 - cos(kXfade * 3.14159)) * 0.5
+
+aPhaserL = (aPhaserL1 * a(kXfade)) + (aPhaserL2 * a(1 - kXfade))
+aPhaserR = (aPhaserR1 * a(kXfade)) + (aPhaserR2 * a(1 - kXfade))
+
+; Mix phaser with dry Flux Chain signal
+aMoonL = (aPhaserL * kPhaserDepth) + (aMoonL * (1 - kPhaserDepth * 0.5))
+aMoonR = (aPhaserR * kPhaserDepth) + (aMoonR * (1 - kPhaserDepth * 0.5))
+
+; ============================================================
+; [D] COSMOS: 8-LINE FDN REVERB/DELAY
+; ============================================================
+
+; Massive delay: V/oct scaled (higher pitch = shorter delay)
+; Range: ~62ms to 2s
+kMassiveDelay_vnorm = (kMassiveDelay - 0.6) * 5
+kMassiveDelay_oct = 2 ^ (-kMassiveDelay_vnorm)
+kMassiveDelay_ms = 250 * kMassiveDelay_oct
+kMassiveDelay_sec = kMassiveDelay_ms / 1000.0
+kMassiveDelay_port portk limit(kMassiveDelay_sec, 0.06, 2.0), 0.2
+
+; Warp: delay length spread
+; 0 = all equal (harmonic), 1 = spread out (reverb)
+kWarp portk kMassiveWarp, 0.1
+
+; Delay line lengths (mutually prime-ish ratios)
+iDelayRatios[] fillarray 1.0, 0.887, 0.781, 0.693, 0.613, 0.541, 0.479, 0.421
+
+kDelayL1 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[0]))
+kDelayL2 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[1]))
+kDelayL3 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[2]))
+kDelayL4 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[3]))
+kDelayL5 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[4]))
+kDelayL6 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[5]))
+kDelayL7 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[6]))
+kDelayL8 = kMassiveDelay_port * (1 - kWarp * (1 - iDelayRatios[7]))
+
+; Feedback gain (with freeze mode - exactly unity for infinite hold)
+kMassiveFeedback_raw = (kFreeze == 1 ? 1.0 : kMassiveFeedback * 0.995)
+kMassiveFeedback_port portk kMassiveFeedback_raw, 0.1
+; In freeze, bypass gain smoothing to hit exactly 1.0
+kMassiveFeedback_actual = (kFreeze == 1 ? 1.0 : kMassiveFeedback_port)
+
+; Density: mix amount (sparse → fully mixed)
+; Use Householder matrix with density blend
+; Force to 1.0 in freeze mode to maintain unity gain
+kDensity_raw = (kFreeze == 1 ? 1.0 : kMassiveDensity)
+kDensity portk kDensity_raw, 0.1
+
+; Mode selection (4 modes for v0)
+kMode = int(kMassiveMode * 3.99)
+
+; Modulation: multi-phase sines (forced to zero in freeze for pitch stability)
+kModDepth_raw scale kMassiveMod, 0.008, 0
+kModDepth = (kFreeze == 1 ? 0 : kModDepth_raw)
+kModRate = (kFreeze == 1 ? 0 : (kModDepth > 0 ? sqrt(kModDepth) * 2.0 : 0))
+; Smoothing (but snap to zero immediately in freeze)
+kModDepth_port portk kModDepth, 0.1
+kModRate_port portk kModRate, 0.1
+
+; Generate 8 phase-offset sine LFOs for modulation (forced to 0 in freeze)
+if kFreeze == 1 then
+    aModLFO1 = 0
+    aModLFO2 = 0
+    aModLFO3 = 0
+    aModLFO4 = 0
+    aModLFO5 = 0
+    aModLFO6 = 0
+    aModLFO7 = 0
+    aModLFO8 = 0
+else
+    aModLFO1 lfo kModDepth_port, kModRate_port, 0
+    aModLFO2 oscili kModDepth_port, kModRate_port, -1, 0.125
+    aModLFO3 oscili kModDepth_port, kModRate_port, -1, 0.25
+    aModLFO4 oscili kModDepth_port, kModRate_port, -1, 0.375
+    aModLFO5 oscili kModDepth_port, kModRate_port, -1, 0.5
+    aModLFO6 oscili kModDepth_port, kModRate_port, -1, 0.625
+    aModLFO7 oscili kModDepth_port, kModRate_port, -1, 0.75
+    aModLFO8 oscili kModDepth_port, kModRate_port, -1, 0.875
+endif
+
+; Input to Massive (muted during freeze)
+kMassiveInput = (kFreeze == 1 ? 0 : 1)
+aMassiveInL = aMoonL * kMassiveInput
+aMassiveInR = aMoonR * kMassiveInput
+
+; Mode-specific input processing
+if kMode == 0 then
+    ; Mode 0: Sparse Echo (minimal diffusion)
+    aMassiveInL = aMassiveInL * 0.7
+    aMassiveInR = aMassiveInR * 0.7
+elseif kMode == 1 then
+    ; Mode 1: Smooth (Hadamard input diffusion)
+    ; Simple diffusion: short alpass filters
+    aDiff1L alpass aMassiveInL, 0.5, 0.005
+    aDiff1R alpass aMassiveInR, 0.5, 0.007
+    aDiff2L alpass aDiff1L, 0.5, 0.011
+    aDiff2R alpass aDiff1R, 0.5, 0.013
+    aMassiveInL = aDiff2L * 0.7
+    aMassiveInR = aDiff2R * 0.7
+elseif kMode == 2 then
+    ; Mode 2: Slow Bloom (long series pre-diffusion)
+    aDiff1L alpass aMassiveInL, 0.5, 0.031
+    aDiff1R alpass aMassiveInR, 0.5, 0.037
+    aDiff2L alpass aDiff1L, 0.5, 0.043
+    aDiff2R alpass aDiff1R, 0.5, 0.047
+    aDiff3L alpass aDiff2L, 0.5, 0.053
+    aDiff3R alpass aDiff2R, 0.5, 0.059
+    aMassiveInL = aDiff3L * 0.5
+    aMassiveInR = aDiff3R * 0.5
+else
+    ; Mode 3: Cross-Filtered (no input diffusion, cross-feedback later)
+    aMassiveInL = aMassiveInL * 0.7
+    aMassiveInR = aMassiveInR * 0.7
+endif
+
+; Denorm protection
+denorm aMassiveInL, aMassiveInR
+
+; FDN: 8 delay lines with Householder mixing
+; Initialize feedback
+aFDN1 init 0
+aFDN2 init 0
+aFDN3 init 0
+aFDN4 init 0
+aFDN5 init 0
+aFDN6 init 0
+aFDN7 init 0
+aFDN8 init 0
+
+; Delay lines with modulation (use non-interpolating reads in freeze)
+; In freeze: round to integer samples and use deltap (non-interpolating)
+; In normal: use deltap3 (interpolating) with modulation
+kDelayL1_freeze = int(kDelayL1 * sr + 0.5) / sr
+kDelayL2_freeze = int(kDelayL2 * sr + 0.5) / sr
+kDelayL3_freeze = int(kDelayL3 * sr + 0.5) / sr
+kDelayL4_freeze = int(kDelayL4 * sr + 0.5) / sr
+kDelayL5_freeze = int(kDelayL5 * sr + 0.5) / sr
+kDelayL6_freeze = int(kDelayL6 * sr + 0.5) / sr
+kDelayL7_freeze = int(kDelayL7 * sr + 0.5) / sr
+kDelayL8_freeze = int(kDelayL8 * sr + 0.5) / sr
+
+aBufFDN1 delayr 2.1
+if kFreeze == 1 then
+    aTapFDN1 deltap kDelayL1_freeze
+else
+    aTapFDN1 deltap3 a(kDelayL1) + aModLFO1
+endif
+delayw aFDN1
+
+aBufFDN2 delayr 2.1
+if kFreeze == 1 then
+    aTapFDN2 deltap kDelayL2_freeze
+else
+    aTapFDN2 deltap3 a(kDelayL2) + aModLFO2
+endif
+delayw aFDN2
+
+aBufFDN3 delayr 2.1
+if kFreeze == 1 then
+    aTapFDN3 deltap kDelayL3_freeze
+else
+    aTapFDN3 deltap3 a(kDelayL3) + aModLFO3
+endif
+delayw aFDN3
+
+aBufFDN4 delayr 2.1
+if kFreeze == 1 then
+    aTapFDN4 deltap kDelayL4_freeze
+else
+    aTapFDN4 deltap3 a(kDelayL4) + aModLFO4
+endif
+delayw aFDN4
+
+aBufFDN5 delayr 2.1
+if kFreeze == 1 then
+    aTapFDN5 deltap kDelayL5_freeze
+else
+    aTapFDN5 deltap3 a(kDelayL5) + aModLFO5
+endif
+delayw aFDN5
+
+aBufFDN6 delayr 2.1
+if kFreeze == 1 then
+    aTapFDN6 deltap kDelayL6_freeze
+else
+    aTapFDN6 deltap3 a(kDelayL6) + aModLFO6
+endif
+delayw aFDN6
+
+aBufFDN7 delayr 2.1
+if kFreeze == 1 then
+    aTapFDN7 deltap kDelayL7_freeze
+else
+    aTapFDN7 deltap3 a(kDelayL7) + aModLFO7
+endif
+delayw aFDN7
+
+aBufFDN8 delayr 2.1
+if kFreeze == 1 then
+    aTapFDN8 deltap kDelayL8_freeze
+else
+    aTapFDN8 deltap3 a(kDelayL8) + aModLFO8
+endif
+delayw aFDN8
+
+; Inject input (split L/R into odd/even lines)
+aTapFDN1 = aTapFDN1 + aMassiveInL
+aTapFDN2 = aTapFDN2 + aMassiveInR
+aTapFDN3 = aTapFDN3 + aMassiveInL
+aTapFDN4 = aTapFDN4 + aMassiveInR
+
+; Householder feedback matrix: A = I - (2/N)·11^T
+; For 8 lines: each output = input - (2/8) * sum(all inputs)
+; Blend with identity based on density
+; In freeze: bypass mixing and use direct feedback for perfect unity gain
+if kFreeze == 1 then
+    ; Freeze: direct feedback, no mixing (guaranteed unity gain)
+    aFDN1_mixed = aTapFDN1
+    aFDN2_mixed = aTapFDN2
+    aFDN3_mixed = aTapFDN3
+    aFDN4_mixed = aTapFDN4
+    aFDN5_mixed = aTapFDN5
+    aFDN6_mixed = aTapFDN6
+    aFDN7_mixed = aTapFDN7
+    aFDN8_mixed = aTapFDN8
+else
+    ; Normal: Householder matrix mixing
+    aSum = aTapFDN1 + aTapFDN2 + aTapFDN3 + aTapFDN4 + aTapFDN5 + aTapFDN6 + aTapFDN7 + aTapFDN8
+    aHouseholder = aSum * (2.0 / 8.0)
+    
+    aFDN1_mixed = aTapFDN1 - (aHouseholder * a(kDensity))
+    aFDN2_mixed = aTapFDN2 - (aHouseholder * a(kDensity))
+    aFDN3_mixed = aTapFDN3 - (aHouseholder * a(kDensity))
+    aFDN4_mixed = aTapFDN4 - (aHouseholder * a(kDensity))
+    aFDN5_mixed = aTapFDN5 - (aHouseholder * a(kDensity))
+    aFDN6_mixed = aTapFDN6 - (aHouseholder * a(kDensity))
+    aFDN7_mixed = aTapFDN7 - (aHouseholder * a(kDensity))
+    aFDN8_mixed = aTapFDN8 - (aHouseholder * a(kDensity))
+endif
+
+; Mode-specific processing
+if kMode == 3 then
+    ; Cross-Filtered: L/R cross-feedback with filtering
+    aFDN1_mixed tone aFDN1_mixed, 3000
+    aFDN3_mixed tone aFDN3_mixed, 3000
+    aFDN5_mixed tone aFDN5_mixed, 3000
+    aFDN7_mixed tone aFDN7_mixed, 3000
+    
+    aFDN2_mixed atone aFDN2_mixed, 500
+    aFDN4_mixed atone aFDN4_mixed, 500
+    aFDN6_mixed atone aFDN6_mixed, 500
+    aFDN8_mixed atone aFDN8_mixed, 500
+endif
+
+; Apply feedback gain and saturation
+; In freeze mode, pass through unchanged (perfect unity gain)
+; In normal mode, use tanh for soft limiting
+if kFreeze == 1 then
+    ; Freeze: perfect unity gain, no processing at all
+    aFDN1 = aFDN1_mixed
+    aFDN2 = aFDN2_mixed
+    aFDN3 = aFDN3_mixed
+    aFDN4 = aFDN4_mixed
+    aFDN5 = aFDN5_mixed
+    aFDN6 = aFDN6_mixed
+    aFDN7 = aFDN7_mixed
+    aFDN8 = aFDN8_mixed
+else
+    ; Normal: tanh saturation with feedback control
+    aFDN1 = tanh(aFDN1_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN2 = tanh(aFDN2_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN3 = tanh(aFDN3_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN4 = tanh(aFDN4_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN5 = tanh(aFDN5_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN6 = tanh(aFDN6_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN7 = tanh(aFDN7_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+    aFDN8 = tanh(aFDN8_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
+endif
+
+; DC blocking (bypassed in freeze mode to preserve unity gain)
+if kFreeze == 0 then
+    aFDN1 dcblock2 aFDN1
+    aFDN2 dcblock2 aFDN2
+    aFDN3 dcblock2 aFDN3
+    aFDN4 dcblock2 aFDN4
+    aFDN5 dcblock2 aFDN5
+    aFDN6 dcblock2 aFDN6
+    aFDN7 dcblock2 aFDN7
+    aFDN8 dcblock2 aFDN8
+endif
+
+; Denorm protection
+denorm aFDN1, aFDN2, aFDN3, aFDN4, aFDN5, aFDN6, aFDN7, aFDN8
+
+; Mix FDN outputs to stereo (increase gain to match level)
+aMassiveL = (aFDN1 + aFDN3 + aFDN5 + aFDN7) * 1.2
+aMassiveR = (aFDN2 + aFDN4 + aFDN6 + aFDN8) * 1.2
+
+; Output filtering (one-pole LP/HP outside feedback)
+kCutoffLo = 80
+kCutoffHi = 8000
+aMassiveL tone aMassiveL, kCutoffHi
+aMassiveR tone aMassiveR, kCutoffHi
+aMassiveL atone aMassiveL, kCutoffLo
+aMassiveR atone aMassiveR, kCutoffLo
+
+; ============================================================
+; OUTPUT: WIDTH, MIX, LIMITER
+; ============================================================
+
+; Width: fixed at 100% for v0
+aWetL = aMassiveL
+aWetR = aMassiveR
+
+; Mix: equal-power crossfade
+kMix_port portk kMix, 0.1
+kMixWet = sin(kMix_port * 1.5708)
+kMixDry = cos(kMix_port * 1.5708)
+
+aOutL = (aSignalL * kMixDry) + (aWetL * kMixWet)
+aOutR = (aSignalR * kMixDry) + (aWetR * kMixWet)
+
+; Soft limiter (Mars Affects style)
+kPeak init 0
+kPeakL = k(abs(aOutL))
+kPeakR = k(abs(aOutR))
+kPeak = max(kPeakL, kPeakR)
+
+kLimiterGain = 1.0
+if kPeak > 0.85 then
+    kLimiterGain = 0.85 / kPeak
+endif
+kLimiterGain portk kLimiterGain, 0.02
+
+aOutL = aOutL * kLimiterGain
+aOutR = aOutR * kLimiterGain
+
+; Final soft clip
+aOutL clip aOutL, 2, 0.95
+aOutR clip aOutR, 2, 0.95
+
+; Output gain (increased to compensate for level loss)
+aOutL = aOutL * 1.2
+aOutR = aOutR * 1.2
+
+outs aOutL, aOutR
+
+; ============================================================
+; CLOCK PULSE OUT
+; ============================================================
+
+kPulseTime init 0
+if kClockTrig == 1 then
+    kPulseTime = 20
+endif
+
+kPulseTime = (kPulseTime > 0 ? kPulseTime - (1000/kr) : 0)
+kPulseTime = max(0, kPulseTime)
+
+gkeol = kPulseTime
+
+; Decrement init counter
+kInit = max(0, kInit - 1)
+
+endin
