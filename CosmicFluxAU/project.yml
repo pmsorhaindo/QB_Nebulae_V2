@@ -1,0 +1,67 @@
+# XcodeGen spec for the CosmicFlux AUv3 (iOS).
+#
+#   brew install xcodegen
+#   cd CosmicFluxAU && xcodegen generate && open CosmicFluxAU.xcodeproj
+#
+# Then set your Team under Signing & Capabilities for BOTH targets
+# (CosmicFluxHost and CosmicFluxAU) and, if the bundle identifiers collide with
+# an existing app on your account, change the prefix below; the extension's
+# identifier must stay prefixed by the app's identifier.
+name: CosmicFluxAU
+options:
+  bundleIdPrefix: com.pmsorhaindo
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CLANG_CXX_LANGUAGE_STANDARD: "c++17"
+    CLANG_CXX_LIBRARY: "libc++"
+    GENERATE_INFOPLIST_FILE: "NO"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_BITCODE: "NO"
+    TARGETED_DEVICE_FAMILY: "1,2"
+  configs:
+    Release:
+      GCC_OPTIMIZATION_LEVEL: "3"
+      SWIFT_OPTIMIZATION_LEVEL: "-O"
+
+targets:
+  CosmicFluxHost:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+    settings:
+      base:
+        PRODUCT_NAME: CosmicFlux
+        PRODUCT_BUNDLE_IDENTIFIER: com.pmsorhaindo.cosmicflux
+        INFOPLIST_FILE: App/Info.plist
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
+    dependencies:
+      - target: CosmicFluxAU
+        embed: true
+
+  CosmicFluxAU:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Extension
+      - path: dsp
+    settings:
+      base:
+        PRODUCT_NAME: CosmicFluxAU
+        PRODUCT_BUNDLE_IDENTIFIER: com.pmsorhaindo.cosmicflux.auv3
+        INFOPLIST_FILE: Extension/Info.plist
+        SWIFT_OBJC_BRIDGING_HEADER: Extension/CosmicFluxAU-Bridging-Header.h
+        SKIP_INSTALL: "YES"
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
+        APPLICATION_EXTENSION_API_ONLY: "YES"
+    dependencies:
+      - sdk: AudioToolbox.framework
+      - sdk: AVFoundation.framework
+      - sdk: CoreAudioKit.framework
+      - sdk: UIKit.framework
