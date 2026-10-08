@@ -271,8 +271,10 @@ def analyze_output(audio_file, scenario_name, input_file=None):
     
     # Check peak level
     peak = np.max(np.abs(audio))
-    if peak > 0.95:
-        issues.append(f"Peak exceeds 0.95 ({peak:.3f})")
+    # Impulses reach 0dBFS which is expected (input is 1.0), so only flag if above
+    peak_threshold = 1.01 if 'impulse' in scenario_name.lower() else 0.95
+    if peak > peak_threshold:
+        issues.append(f"Peak exceeds {peak_threshold} ({peak:.3f})")
     elif peak < 0.001 and "silence" not in scenario_name.lower():
         issues.append(f"Peak too low ({peak:.6f}) - possibly silent")
     

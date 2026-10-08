@@ -558,37 +558,80 @@ aFDN6 init 0
 aFDN7 init 0
 aFDN8 init 0
 
-; Delay lines with modulation
+; Delay lines with modulation (use non-interpolating reads in freeze)
+; In freeze: round to integer samples and use deltap (non-interpolating)
+; In normal: use deltap3 (interpolating) with modulation
+kDelayL1_freeze = int(kDelayL1 * sr + 0.5) / sr
+kDelayL2_freeze = int(kDelayL2 * sr + 0.5) / sr
+kDelayL3_freeze = int(kDelayL3 * sr + 0.5) / sr
+kDelayL4_freeze = int(kDelayL4 * sr + 0.5) / sr
+kDelayL5_freeze = int(kDelayL5 * sr + 0.5) / sr
+kDelayL6_freeze = int(kDelayL6 * sr + 0.5) / sr
+kDelayL7_freeze = int(kDelayL7 * sr + 0.5) / sr
+kDelayL8_freeze = int(kDelayL8 * sr + 0.5) / sr
+
 aBufFDN1 delayr 2.1
-aTapFDN1 deltap3 a(kDelayL1) + aModLFO1
+if kFreeze == 1 then
+    aTapFDN1 deltap kDelayL1_freeze
+else
+    aTapFDN1 deltap3 a(kDelayL1) + aModLFO1
+endif
 delayw aFDN1
 
 aBufFDN2 delayr 2.1
-aTapFDN2 deltap3 a(kDelayL2) + aModLFO2
+if kFreeze == 1 then
+    aTapFDN2 deltap kDelayL2_freeze
+else
+    aTapFDN2 deltap3 a(kDelayL2) + aModLFO2
+endif
 delayw aFDN2
 
 aBufFDN3 delayr 2.1
-aTapFDN3 deltap3 a(kDelayL3) + aModLFO3
+if kFreeze == 1 then
+    aTapFDN3 deltap kDelayL3_freeze
+else
+    aTapFDN3 deltap3 a(kDelayL3) + aModLFO3
+endif
 delayw aFDN3
 
 aBufFDN4 delayr 2.1
-aTapFDN4 deltap3 a(kDelayL4) + aModLFO4
+if kFreeze == 1 then
+    aTapFDN4 deltap kDelayL4_freeze
+else
+    aTapFDN4 deltap3 a(kDelayL4) + aModLFO4
+endif
 delayw aFDN4
 
 aBufFDN5 delayr 2.1
-aTapFDN5 deltap3 a(kDelayL5) + aModLFO5
+if kFreeze == 1 then
+    aTapFDN5 deltap kDelayL5_freeze
+else
+    aTapFDN5 deltap3 a(kDelayL5) + aModLFO5
+endif
 delayw aFDN5
 
 aBufFDN6 delayr 2.1
-aTapFDN6 deltap3 a(kDelayL6) + aModLFO6
+if kFreeze == 1 then
+    aTapFDN6 deltap kDelayL6_freeze
+else
+    aTapFDN6 deltap3 a(kDelayL6) + aModLFO6
+endif
 delayw aFDN6
 
 aBufFDN7 delayr 2.1
-aTapFDN7 deltap3 a(kDelayL7) + aModLFO7
+if kFreeze == 1 then
+    aTapFDN7 deltap kDelayL7_freeze
+else
+    aTapFDN7 deltap3 a(kDelayL7) + aModLFO7
+endif
 delayw aFDN7
 
 aBufFDN8 delayr 2.1
-aTapFDN8 deltap3 a(kDelayL8) + aModLFO8
+if kFreeze == 1 then
+    aTapFDN8 deltap kDelayL8_freeze
+else
+    aTapFDN8 deltap3 a(kDelayL8) + aModLFO8
+endif
 delayw aFDN8
 
 ; Inject input (split L/R into odd/even lines)
@@ -600,17 +643,31 @@ aTapFDN4 = aTapFDN4 + aMassiveInR
 ; Householder feedback matrix: A = I - (2/N)·11^T
 ; For 8 lines: each output = input - (2/8) * sum(all inputs)
 ; Blend with identity based on density
-aSum = aTapFDN1 + aTapFDN2 + aTapFDN3 + aTapFDN4 + aTapFDN5 + aTapFDN6 + aTapFDN7 + aTapFDN8
-aHouseholder = aSum * (2.0 / 8.0)
-
-aFDN1_mixed = aTapFDN1 - (aHouseholder * a(kDensity))
-aFDN2_mixed = aTapFDN2 - (aHouseholder * a(kDensity))
-aFDN3_mixed = aTapFDN3 - (aHouseholder * a(kDensity))
-aFDN4_mixed = aTapFDN4 - (aHouseholder * a(kDensity))
-aFDN5_mixed = aTapFDN5 - (aHouseholder * a(kDensity))
-aFDN6_mixed = aTapFDN6 - (aHouseholder * a(kDensity))
-aFDN7_mixed = aTapFDN7 - (aHouseholder * a(kDensity))
-aFDN8_mixed = aTapFDN8 - (aHouseholder * a(kDensity))
+; In freeze: bypass mixing and use direct feedback for perfect unity gain
+if kFreeze == 1 then
+    ; Freeze: direct feedback, no mixing (guaranteed unity gain)
+    aFDN1_mixed = aTapFDN1
+    aFDN2_mixed = aTapFDN2
+    aFDN3_mixed = aTapFDN3
+    aFDN4_mixed = aTapFDN4
+    aFDN5_mixed = aTapFDN5
+    aFDN6_mixed = aTapFDN6
+    aFDN7_mixed = aTapFDN7
+    aFDN8_mixed = aTapFDN8
+else
+    ; Normal: Householder matrix mixing
+    aSum = aTapFDN1 + aTapFDN2 + aTapFDN3 + aTapFDN4 + aTapFDN5 + aTapFDN6 + aTapFDN7 + aTapFDN8
+    aHouseholder = aSum * (2.0 / 8.0)
+    
+    aFDN1_mixed = aTapFDN1 - (aHouseholder * a(kDensity))
+    aFDN2_mixed = aTapFDN2 - (aHouseholder * a(kDensity))
+    aFDN3_mixed = aTapFDN3 - (aHouseholder * a(kDensity))
+    aFDN4_mixed = aTapFDN4 - (aHouseholder * a(kDensity))
+    aFDN5_mixed = aTapFDN5 - (aHouseholder * a(kDensity))
+    aFDN6_mixed = aTapFDN6 - (aHouseholder * a(kDensity))
+    aFDN7_mixed = aTapFDN7 - (aHouseholder * a(kDensity))
+    aFDN8_mixed = aTapFDN8 - (aHouseholder * a(kDensity))
+endif
 
 ; Mode-specific processing
 if kMode == 3 then
@@ -627,19 +684,18 @@ if kMode == 3 then
 endif
 
 ; Apply feedback gain and saturation
-; In freeze mode, use exactly unity gain (1.0) with gentle limiting
+; In freeze mode, pass through unchanged (perfect unity gain)
 ; In normal mode, use tanh for soft limiting
 if kFreeze == 1 then
-    ; Freeze: true unity gain loop
-    ; Only limit to prevent numeric overflow, no gain reduction
-    aFDN1 = limit(aFDN1_mixed, -2.0, 2.0)
-    aFDN2 = limit(aFDN2_mixed, -2.0, 2.0)
-    aFDN3 = limit(aFDN3_mixed, -2.0, 2.0)
-    aFDN4 = limit(aFDN4_mixed, -2.0, 2.0)
-    aFDN5 = limit(aFDN5_mixed, -2.0, 2.0)
-    aFDN6 = limit(aFDN6_mixed, -2.0, 2.0)
-    aFDN7 = limit(aFDN7_mixed, -2.0, 2.0)
-    aFDN8 = limit(aFDN8_mixed, -2.0, 2.0)
+    ; Freeze: perfect unity gain, no processing at all
+    aFDN1 = aFDN1_mixed
+    aFDN2 = aFDN2_mixed
+    aFDN3 = aFDN3_mixed
+    aFDN4 = aFDN4_mixed
+    aFDN5 = aFDN5_mixed
+    aFDN6 = aFDN6_mixed
+    aFDN7 = aFDN7_mixed
+    aFDN8 = aFDN8_mixed
 else
     ; Normal: tanh saturation with feedback control
     aFDN1 = tanh(aFDN1_mixed * a(kMassiveFeedback_actual) * 2) * 0.5
