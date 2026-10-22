@@ -1,0 +1,32 @@
+{
+  "name": "Cosmic Freeze",
+  "duration": 20.0,
+  "static": {
+    "loopstart": 0.3,
+    "loopsize": 0.5,
+    "overlap": 0.5,
+    "speed": 0.5,
+    "pitch": 0.52,
+    "density": 0.92,
+    "window": 0.92,
+    "blend": 0.9,
+    "loopstart_alt": 0.15,
+    "loopsize_alt": 0.5,
+    "overlap_alt": 0.15,
+    "density_alt": 0.8,
+    "window_alt": 0.0,
+    "pitch_alt": 0.25,
+    "blend_alt": 0.0,
+    "record": 0,
+    "file": 0,
+    "source": 0,
+    "freeze_alt": 0,
+    "record_alt": 0,
+    "file_alt": 1
+  },
+  "gates": {
+    "freeze": [
+      2.5
+    ]
+  }
+}
