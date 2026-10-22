@@ -5,10 +5,10 @@ import AudioToolbox
 import CoreAudioKit
 import UIKit
 
-@objc(CosmicFluxAudioUnitViewController)
-public class CosmicFluxAudioUnitViewController: AUViewController, AUAudioUnitFactory {
+@objc(LunarHazeAudioUnitViewController)
+public class LunarHazeAudioUnitViewController: AUViewController, AUAudioUnitFactory {
 
-    private var audioUnit: CosmicFluxAudioUnit?
+    private var audioUnit: LunarHazeAudioUnit?
     private var observerToken: AUParameterObserverToken?
     private var controls: [AUParameterAddress: UIControl] = [:]
     private var valueLabels: [AUParameterAddress: UILabel] = [:]
@@ -30,7 +30,7 @@ public class CosmicFluxAudioUnitViewController: AUViewController, AUAudioUnitFac
     // MARK: AUAudioUnitFactory
 
     public func createAudioUnit(with componentDescription: AudioComponentDescription) throws -> AUAudioUnit {
-        let unit = try CosmicFluxAudioUnit(componentDescription: componentDescription, options: [])
+        let unit = try LunarHazeAudioUnit(componentDescription: componentDescription, options: [])
         audioUnit = unit
         DispatchQueue.main.async { [weak self] in
             guard let self = self, self.isViewLoaded else { return }
@@ -80,7 +80,7 @@ public class CosmicFluxAudioUnitViewController: AUViewController, AUAudioUnitFac
         ])
 
         let title = UILabel()
-        title.text = "CosmicFlux"
+        title.text = "Lunar Haze"
         title.font = UIFont.boldSystemFont(ofSize: 22)
         stack.addArrangedSubview(title)
     }

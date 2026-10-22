@@ -1,6 +1,6 @@
-# CosmicFlux Development and Test Harness
+# Lunar Haze Development and Test Harness
 
-This directory contains offline testing tools for the CosmicFlux instrument.
+This directory contains offline testing tools for the Lunar Haze instrument.
 
 ## Overview
 

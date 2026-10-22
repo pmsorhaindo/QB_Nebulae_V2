@@ -1,8 +1,8 @@
-#include "CosmicFluxParams.h"
+#include "LunarHazeParams.h"
 
 #include <cstring>
 
-namespace cosmicflux {
+namespace lunarhaze {
 
 namespace {
 
@@ -75,4 +75,4 @@ int indexFromNormalized(int id, float normalized) {
     return idx;
 }
 
-}  // namespace cosmicflux
+}  // namespace lunarhaze

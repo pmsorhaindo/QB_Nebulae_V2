@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate test signals for CosmicFlux offline testing
+Generate test signals for Lunar Haze offline testing
 
 Creates various synthetic test signals:
 - Impulse
@@ -187,7 +187,7 @@ def generate_silence(duration=60.0):
 def main():
     """Generate all test signals"""
     
-    print("Generating test signals for CosmicFlux...")
+    print("Generating test signals for Lunar Haze...")
     
     OUTPUT_DIR.mkdir(exist_ok=True)
     

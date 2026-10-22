@@ -1,4 +1,4 @@
-// CosmicFlux DSP core: a C++ port of Instruments/CosmicFlux/cosmicflux.instr.
+// Lunar Haze DSP core: a C++ port of Instruments/CosmicFlux/cosmicflux.instr.
 //
 // Design notes
 //  - No Csound at runtime. Every opcode used by the instrument (portk, tone,
@@ -20,9 +20,9 @@
 #include <cstdint>
 #include <vector>
 
-#include "CosmicFluxParams.h"
+#include "LunarHazeParams.h"
 
-namespace cosmicflux {
+namespace lunarhaze {
 
 namespace detail {
 
@@ -147,11 +147,11 @@ struct BlockDelay {
 
 }  // namespace detail
 
-class CosmicFluxDSP {
+class LunarHazeDSP {
 public:
     static constexpr int kControlBlock = 64;  // ksmps in the Nebulae instrument
 
-    CosmicFluxDSP();
+    LunarHazeDSP();
 
     // Allocates all delay memory for the given sample rate. Not real-time safe.
     void prepare(double sampleRate);
@@ -252,4 +252,4 @@ private:
     float limiterGain_ = 1.0f;
 };
 
-}  // namespace cosmicflux
+}  // namespace lunarhaze

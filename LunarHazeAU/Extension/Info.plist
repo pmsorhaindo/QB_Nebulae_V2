@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>CosmicFlux</string>
+	<string>Lunar Haze</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -28,17 +28,17 @@
 			<array>
 				<dict>
 					<key>description</key>
-					<string>CosmicFlux cosmic delay and reverb</string>
+					<string>Lunar Haze delay and reverb</string>
 					<key>factoryFunction</key>
-					<string>CosmicFluxAudioUnitViewController</string>
+					<string>LunarHazeAudioUnitViewController</string>
 					<key>manufacturer</key>
 					<string>PMSo</string>
 					<key>name</key>
-					<string>Sorhaindo: CosmicFlux</string>
+					<string>Sorhaindo: Lunar Haze</string>
 					<key>sandboxSafe</key>
 					<true/>
 					<key>subtype</key>
-					<string>Cflx</string>
+					<string>lnhz</string>
 					<key>tags</key>
 					<array>
 						<string>Effects</string>
@@ -53,7 +53,7 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.AudioUnit-UI</string>
 		<key>NSExtensionPrincipalClass</key>
-		<string>CosmicFluxAudioUnitViewController</string>
+		<string>LunarHazeAudioUnitViewController</string>
 	</dict>
 </dict>
 </plist>

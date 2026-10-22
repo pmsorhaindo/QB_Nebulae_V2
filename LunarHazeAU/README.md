@@ -1,17 +1,18 @@
-# CosmicFlux AUv3 (iOS)
+# Lunar Haze AUv3 (iOS)
 
-An AUv3 audio effect (`aufx`) version of the CosmicFlux Nebulae instrument, for
-use inside AUM and other AUv3 hosts on iPhone and iPad. The DSP is a C++ port of
-`Instruments/CosmicFlux/cosmicflux.instr`; nothing here depends on Csound at
-runtime, and the Nebulae `.instr` is untouched.
+An AUv3 audio effect (`aufx`) of Lunar Haze, for use inside AUM and other AUv3
+hosts on iPhone and iPad. The DSP is a C++ port of the Nebulae instrument at
+`Instruments/CosmicFlux/cosmicflux.instr`. That filename is what the firmware
+loads from USB, so the instrument file and its folder are unchanged. Nothing
+here depends on Csound at runtime.
 
 ## Status: what has and has not been verified
 
 Built and tested on Linux (g++ 13, CMake):
 
 - `dsp/` - the portable C++ core.
-- `tools/cosmicflux_render` - offline renderer that mirrors the Csound dev harness.
-- `tools/cosmicflux_tests` - automated checks: bit-identical output for any host
+- `tools/lunarhaze_render` - offline renderer that mirrors the Csound dev harness.
+- `tools/lunarhaze_tests` - automated checks: bit-identical output for any host
   buffer size (1 to 4096 frames, mixed sizes), zero heap allocations inside
   `process()`, 44.1 kHz and 48 kHz operation, 60 s freeze stability, silence.
 - `tools/compare_with_csound.py` - renders the dev scenarios through the C++
@@ -40,13 +41,13 @@ is MIT) and makes the project easy to generate with XcodeGen.
 ## Layout
 
 ```
-CosmicFluxAU/
+LunarHazeAU/
   project.yml                  XcodeGen spec: app + AUv3 extension
   CMakeLists.txt               builds the C++ core and offline tools on any OS
-  dsp/CosmicFluxParams.*       parameter ids, names, Nebulae channel mapping
-  dsp/CosmicFluxDSP.*          the effect (port of cosmicflux.instr)
-  tools/render_offline.cpp     cosmicflux_render CLI
-  tools/cosmicflux_tests.cpp   automated checks
+  dsp/LunarHazeParams.*        parameter ids, names, Nebulae channel mapping
+  dsp/LunarHazeDSP.*           the effect (port of cosmicflux.instr)
+  tools/render_offline.cpp     lunarhaze_render CLI
+  tools/lunarhaze_tests.cpp    automated checks
   tools/compare_with_csound.py Csound vs C++ comparison
   Extension/                   AUv3 app extension (aufx, stereo in/out)
   App/                         minimal SwiftUI container app
@@ -133,15 +134,15 @@ three Michael scenarios). State save/restore is implemented through
 ## Building and testing the C++ core (Linux or macOS)
 
 ```
-cd CosmicFluxAU
+cd LunarHazeAU
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-./build/cosmicflux_tests
-./build/cosmicflux_render --in input.wav --out out.wav --set blend=0.6 --set record=1
-python3 tools/compare_with_csound.py --render-bin build/cosmicflux_render   # needs csound + the dev test file
+./build/lunarhaze_tests
+./build/lunarhaze_render --in input.wav --out out.wav --set blend=0.6 --set record=1
+python3 tools/compare_with_csound.py --render-bin build/lunarhaze_render   # needs csound + the dev test file
 ```
 
-`cosmicflux_render` accepts the Nebulae channel names used by the dev scenarios
+`lunarhaze_render` accepts the Nebulae channel names used by the dev scenarios
 (`--set start=0.3`, `--gate freeze=3.0`, `--ramp pitch=0,1`), honours the input
 file's sample rate and pads with silence to `--duration`.
 
@@ -157,13 +158,13 @@ phone, and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 1. Clone the fork and check out this branch, then generate the project:
 
    ```
-   cd QB_Nebulae_V2/CosmicFluxAU
+   cd QB_Nebulae_V2/LunarHazeAU
    xcodegen generate
-   open CosmicFluxAU.xcodeproj
+   open LunarHazeAU.xcodeproj
    ```
 
 2. In Xcode select the project in the navigator, then for each of the two
-   targets (`CosmicFluxHost` and `CosmicFluxAU`) open Signing & Capabilities,
+   targets (`LunarHazeHost` and `LunarHazeAU`) open Signing & Capabilities,
    tick "Automatically manage signing" and pick your Team. If Xcode reports that
    a bundle identifier is taken, change `com.pmsorhaindo` in `project.yml` to
    your own prefix (keep the extension id prefixed by the app id), run
@@ -171,7 +172,7 @@ phone, and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 
 3. Plug in the iPhone, unlock it and tap "Trust" if asked. On iOS 16 and later
    enable Developer Mode (Settings > Privacy & Security > Developer Mode, then
-   restart the phone). In Xcode choose the `CosmicFluxHost` scheme and your
+   restart the phone). In Xcode choose the `LunarHazeHost` scheme and your
    iPhone as the run destination (top toolbar).
 
 4. Press Run (Cmd-R). The first build is a few minutes. With a free Apple ID the
@@ -179,12 +180,12 @@ phone, and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
    Settings > General > VPN & Device Management, tap your Apple ID under
    Developer App and tap Trust, then run again (or just tap the app icon).
 
-5. Open the CosmicFlux app once. That is all it does; it registers the Audio
+5. Open the Lunar Haze app once. That is all it does; it registers the Audio
    Unit extension with iOS.
 
 6. In AUM: tap "+" to add a channel, pick an input (Audio Input for a mic or
    interface, or a File Player), then tap the "+" below it in the Effects slot,
-   choose "Audio Unit Effects" and pick "Sorhaindo: CosmicFlux". Tap the node to
+   choose "Audio Unit Effects" and pick "Sorhaindo: Lunar Haze". Tap the node to
    open the plug-in UI, or use AUM's own parameter view. MIDI mapping and
    automation work through AUM's standard parameter mapping (long-press a
    control in AUM's parameter view, or use the MIDI Control page). Saving the
@@ -194,16 +195,16 @@ phone, and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
    TestFlight, then install from the TestFlight app on the phone.
 
 If you do not want XcodeGen: in Xcode create a new iOS App named
-`CosmicFluxHost`, add a target with the "Audio Unit Extension" template
-(type Effect, manufacturer `PMSo`, subtype `Cflx`), delete the template's
+`LunarHazeHost`, add a target with the "Audio Unit Extension" template
+(type Effect, manufacturer `PMSo`, subtype `lnhz`), delete the template's
 generated DSP/UI files, add the files from `Extension/` and `dsp/` to the
 extension target, set the bridging header to
-`Extension/CosmicFluxAU-Bridging-Header.h`, and replace the extension's
+`Extension/LunarHazeAU-Bridging-Header.h`, and replace the extension's
 `Info.plist` with `Extension/Info.plist`.
 
 ## Troubleshooting
 
-- The plug-in does not appear in AUM: launch the CosmicFlux app once, then
+- The plug-in does not appear in AUM: launch the Lunar Haze app once, then
   fully quit and reopen AUM. If it still does not show, delete the app from the
   phone, reboot, and install again. AUM lists it under Audio Unit Effects.
 - Build error about ObjC pointers in a C++ struct: make sure the file is

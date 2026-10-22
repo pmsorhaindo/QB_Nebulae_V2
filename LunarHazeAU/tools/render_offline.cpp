@@ -1,4 +1,4 @@
-// Offline renderer for the CosmicFlux C++ core.
+// Offline renderer for the Lunar Haze C++ core.
 //
 // Mirrors the Csound dev harness (Instruments/CosmicFlux/dev/render.py):
 //   --set   channel=value          static control (Nebulae channel names)
@@ -14,8 +14,8 @@
 #include <string>
 #include <vector>
 
-#include "../dsp/CosmicFluxDSP.h"
-#include "../dsp/CosmicFluxParams.h"
+#include "../dsp/LunarHazeDSP.h"
+#include "../dsp/LunarHazeParams.h"
 #include "WavIO.h"
 
 namespace {
@@ -24,10 +24,10 @@ struct GateEvent { int param; double time; bool first; };
 struct Ramp { int param; float start, end; double t0, t1; };
 
 int paramFromName(const std::string& name) {
-    int id = cosmicflux::paramIdForNebulaeChannel(name.c_str());
+    int id = lunarhaze::paramIdForNebulaeChannel(name.c_str());
     if (id < 0) {
-        for (int i = 0; i < cosmicflux::kNumParams; ++i) {
-            if (name == cosmicflux::paramInfo(i).identifier) return i;
+        for (int i = 0; i < lunarhaze::kNumParams; ++i) {
+            if (name == lunarhaze::paramInfo(i).identifier) return i;
         }
     }
     return id;
@@ -47,7 +47,7 @@ std::vector<std::string> split(const std::string& s, char sep) {
 
 void usage() {
     std::fprintf(stderr,
-                 "usage: cosmicflux_render --in in.wav --out out.wav [--duration S] [--block N]\n"
+                 "usage: lunarhaze_render --in in.wav --out out.wav [--duration S] [--block N]\n"
                  "       [--csound-init] [--pcm16] [--set ch=v]... [--gate ch=t,...]... [--ramp ch=a,b[,t0,t1]]...\n");
 }
 
@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
     }
     std::vector<float> outL(frames, 0.0f), outR(frames, 0.0f);
 
-    cosmicflux::CosmicFluxDSP dsp;
+    lunarhaze::LunarHazeDSP dsp;
     dsp.prepare(double(sr));
     for (auto& s : statics) dsp.setParam(s.first, s.second);
     for (auto& r : ramps) {

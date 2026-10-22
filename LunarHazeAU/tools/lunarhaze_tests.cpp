@@ -1,4 +1,4 @@
-// Self-contained checks for the CosmicFlux C++ core (no external test framework).
+// Self-contained checks for the Lunar Haze C++ core (no external test framework).
 //   1. buffer-size independence: identical output for any host block size (1..4096)
 //   2. real-time safety: no heap allocation inside process()
 //   3. 44.1 kHz and 48 kHz both run, finite, and land at similar levels
@@ -10,7 +10,7 @@
 #include <new>
 #include <vector>
 
-#include "../dsp/CosmicFluxDSP.h"
+#include "../dsp/LunarHazeDSP.h"
 
 namespace {
 
@@ -52,8 +52,8 @@ void makeTestSignal(std::vector<float>& l, std::vector<float>& r, int sr, double
     }
 }
 
-void setBusyParams(cosmicflux::CosmicFluxDSP& d) {
-    using namespace cosmicflux;
+void setBusyParams(lunarhaze::LunarHazeDSP& d) {
+    using namespace lunarhaze;
     d.setParam(pTime, 0.35f); d.setParam(pFeedback, 0.6f); d.setParam(pDimension, 0.5f);
     d.setParam(pMultiply, 0.9f); d.setParam(pCosmosDelay, 0.55f); d.setParam(pCosmosDensity, 0.6f);
     d.setParam(pCosmosFeedback, 0.5f); d.setParam(pMix, 0.6f); d.setParam(pEarlyMod, 0.4f);
@@ -62,7 +62,7 @@ void setBusyParams(cosmicflux::CosmicFluxDSP& d) {
     d.setParam(pPhaser, 1.0f); d.setParam(pPhaserSync, 1.0f); d.setParam(pFlangerMode, 0.9f);
 }
 
-void renderWithBlocks(cosmicflux::CosmicFluxDSP& d, const std::vector<float>& l, const std::vector<float>& r,
+void renderWithBlocks(lunarhaze::LunarHazeDSP& d, const std::vector<float>& l, const std::vector<float>& r,
                       std::vector<float>& ol, std::vector<float>& orr, const std::vector<int>& blocks) {
     size_t pos = 0, bi = 0;
     while (pos < l.size()) {
@@ -87,7 +87,7 @@ bool allFinite(const std::vector<float>& a) {
 }  // namespace
 
 int main() {
-    using namespace cosmicflux;
+    using namespace lunarhaze;
 
     // ---- 1. block-size independence ----
     {
@@ -97,7 +97,7 @@ int main() {
         std::vector<std::vector<int>> patterns = {{64}, {1}, {7}, {480}, {4096}, {64, 32, 100, 3, 512, 1}};
         std::vector<std::vector<float>> outs;
         for (auto& pat : patterns) {
-            CosmicFluxDSP d;
+            LunarHazeDSP d;
             d.prepare(sr);
             setBusyParams(d);
             d.reset(true);
@@ -117,7 +117,7 @@ int main() {
 
     // ---- 2. no allocation on the audio thread ----
     {
-        CosmicFluxDSP d;
+        LunarHazeDSP d;
         d.prepare(44100.0);
         setBusyParams(d);
         d.reset(true);
@@ -142,7 +142,7 @@ int main() {
         int rates[2] = {44100, 48000};
         bool finite = true;
         for (int k = 0; k < 2; ++k) {
-            CosmicFluxDSP d;
+            LunarHazeDSP d;
             d.prepare(rates[k]);
             setBusyParams(d);
             d.reset(true);
@@ -161,7 +161,7 @@ int main() {
     // ---- 4. freeze bounded over 60 s ----
     {
         const int sr = 48000;
-        CosmicFluxDSP d;
+        LunarHazeDSP d;
         d.prepare(sr);
         setBusyParams(d);
         d.setParam(pMix, 1.0f);
@@ -189,7 +189,7 @@ int main() {
 
     // ---- 5. silence ----
     {
-        CosmicFluxDSP d;
+        LunarHazeDSP d;
         d.prepare(48000.0);
         d.reset(true);
         std::vector<float> zl(48000, 0.0f), zr(48000, 0.0f), ol(48000), orr(48000);

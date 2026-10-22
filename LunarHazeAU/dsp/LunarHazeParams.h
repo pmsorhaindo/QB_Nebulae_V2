@@ -1,4 +1,4 @@
-// CosmicFlux parameter definitions shared by the DSP core, the offline
+// Lunar Haze parameter definitions shared by the DSP core, the offline
 // renderer and the AUv3 wrapper.
 //
 // Every parameter is stored internally as a normalised 0..1 float, which is
@@ -7,7 +7,7 @@
 // the host with friendlier units and converted with the helpers below.
 #pragma once
 
-namespace cosmicflux {
+namespace lunarhaze {
 
 enum ParamId : int {
     pTime = 0,        // start        - Flux Chain delay time (10 ms .. 1.2 s, exponential)
@@ -51,7 +51,7 @@ struct ParamInfo {
 
 const ParamInfo& paramInfo(int id);
 
-// Returns -1 when the channel is not a CosmicFlux control.
+// Returns -1 when the channel is not a Lunar Haze control.
 int paramIdForNebulaeChannel(const char* channel);
 
 // Indexed parameters: convert between the host-facing step index and the
@@ -59,4 +59,4 @@ int paramIdForNebulaeChannel(const char* channel);
 float normalizedFromIndex(int id, int index);
 int indexFromNormalized(int id, float normalized);
 
-}  // namespace cosmicflux
+}  // namespace lunarhaze

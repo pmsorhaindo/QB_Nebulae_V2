@@ -3,10 +3,10 @@
 Render the dev scenarios through the C++ core and compare with Csound renders.
 
 Usage (from the repo root, after building with CMake):
-    python3 CosmicFluxAU/tools/compare_with_csound.py --render-bin /tmp/cfbuild/cosmicflux_render
+    python3 LunarHazeAU/tools/compare_with_csound.py --render-bin /tmp/cfbuild/lunarhaze_render
 
 For each scenario the script:
-  * renders the scenario with the C++ core (`cosmicflux_render --csound-init`)
+  * renders the scenario with the C++ core (`lunarhaze_render --csound-init`)
     using the same input file as the Csound harness,
   * loads the Csound render (dev/examples for the Michael scenarios, otherwise
     rendered on the fly with dev/render.py if csound is installed),
@@ -70,7 +70,7 @@ def main():
     ap.add_argument("--render-bin", required=True)
     ap.add_argument("--scenarios", nargs="*", default=["michael_subtle", "michael_rhythmic", "michael_freeze",
                                                         "01_defaults", "05_phaser_on", "07_mode_sweep"])
-    ap.add_argument("--out", default="/tmp/cosmicflux_compare")
+    ap.add_argument("--out", default="/tmp/lunarhaze_compare")
     a = ap.parse_args()
     out_dir = Path(a.out)
     out_dir.mkdir(parents=True, exist_ok=True)
