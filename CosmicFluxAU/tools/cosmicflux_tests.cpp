@@ -200,6 +200,58 @@ int main() {
         check(peak < 1e-6, "silence in gives silence out");
     }
 
+    // ---- 6. parameter smoothing: no large discontinuities on abrupt changes ----
+    {
+        const int sr = 48000;
+        CosmicFluxDSP d;
+        d.prepare(sr);
+        setBusyParams(d);
+        d.reset(true);
+        std::vector<float> l, r;
+        makeTestSignal(l, r, sr, 2.0);
+        std::vector<float> ol(l.size()), orr(r.size());
+        
+        // Render a few blocks, then abruptly change all critical parameters
+        int pos = 0;
+        const int blockSize = 64;
+        while (pos < sr / 2) {  // 0.5 seconds
+            int n = std::min(blockSize, (int)l.size() - pos);
+            d.process(l.data() + pos, r.data() + pos, ol.data() + pos, orr.data() + pos, n);
+            pos += n;
+        }
+        
+        // Abruptly change critical parameters (delay times, feedback, mix)
+        d.setParam(pTime, 0.8f);           // Large delay time jump
+        d.setParam(pFeedback, 0.2f);       // Feedback change
+        d.setParam(pMix, 0.9f);            // Mix change
+        d.setParam(pCosmosDelay, 0.3f);    // Cosmos delay time jump
+        d.setParam(pCosmosFeedback, 0.8f); // Cosmos feedback change
+        d.setParam(pFeedbackFilter, 0.8f); // Filter change
+        
+        // Continue rendering and check for discontinuities
+        double maxDelta = 0.0;
+        float prevL = ol[pos - 1], prevR = orr[pos - 1];
+        while (pos < (int)l.size()) {
+            int n = std::min(blockSize, (int)l.size() - pos);
+            d.process(l.data() + pos, r.data() + pos, ol.data() + pos, orr.data() + pos, n);
+            for (int i = 0; i < n; ++i) {
+                double deltaL = std::fabs(ol[pos + i] - prevL);
+                double deltaR = std::fabs(orr[pos + i] - prevR);
+                maxDelta = std::max(maxDelta, std::max(deltaL, deltaR));
+                prevL = ol[pos + i];
+                prevR = orr[pos + i];
+            }
+            pos += n;
+        }
+        
+        std::printf("  max sample-to-sample delta after abrupt parameter changes: %.5f\n", maxDelta);
+        // With smoothing, deltas should be significantly reduced. Without smoothing,
+        // zipper artifacts would show deltas > 1.0. With per-sample ramping over 64 samples,
+        // we expect deltas < 1.0, typically around 0.3-0.8 for aggressive parameter jumps
+        // in a complex multi-stage effect with crossfading delays.
+        check(maxDelta < 1.0, "parameter smoothing reduces sample discontinuities (no large zipper artifacts)");
+    }
+
     std::printf("%s (%d failure%s)\n", gFailures == 0 ? "ALL PASSED" : "FAILED", gFailures, gFailures == 1 ? "" : "s");
     return gFailures == 0 ? 0 : 1;
 }
