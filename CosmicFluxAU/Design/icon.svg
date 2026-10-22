@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="atmosphere" cx="48%" cy="46%" r="62%">
+      <stop offset="0%" stop-color="#3a1468" stop-opacity="0.85"/>
+      <stop offset="42%" stop-color="#1a0834" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="moonGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f4eeff" stop-opacity="0.55"/>
+      <stop offset="68%" stop-color="#d9c8ff" stop-opacity="0.62"/>
+      <stop offset="84%" stop-color="#7c4dff" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#7c4dff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="moonBody" cx="36%" cy="32%" r="72%">
+      <stop offset="0%" stop-color="#fff9f2"/>
+      <stop offset="28%" stop-color="#f3e9fb"/>
+      <stop offset="58%" stop-color="#d2c0ea"/>
+      <stop offset="82%" stop-color="#a08bbf"/>
+      <stop offset="100%" stop-color="#6d5a8c"/>
+    </radialGradient>
+    <radialGradient id="moonShade" cx="70%" cy="72%" r="55%">
+      <stop offset="0%" stop-color="#2a1248" stop-opacity="0.45"/>
+      <stop offset="55%" stop-color="#2a1248" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#2a1248" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mistSoft" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e7d4ff" stop-opacity="0.78"/>
+      <stop offset="38%" stop-color="#a56bff" stop-opacity="0.42"/>
+      <stop offset="100%" stop-color="#6a2cff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mistDeep" cx="45%" cy="40%" r="55%">
+      <stop offset="0%" stop-color="#c9a6ff" stop-opacity="0.7"/>
+      <stop offset="40%" stop-color="#6d28d9" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#3b0764" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mistWisp" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#f4e9ff" stop-opacity="0.55"/>
+      <stop offset="50%" stop-color="#b388ff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#b388ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="starHalo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="35%" stop-color="#e6d4ff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#e6d4ff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="haze" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+    <filter id="hazeTight" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <clipPath id="moonClip">
+      <circle cx="500" cy="468" r="292"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1024" height="1024" fill="#000000"/>
+  <circle cx="512" cy="500" r="620" fill="url(#atmosphere)"/>
+
+  <circle cx="500" cy="468" r="430" fill="url(#moonGlow)"/>
+  <circle cx="500" cy="468" r="292" fill="url(#moonBody)"/>
+  <g clip-path="url(#moonClip)">
+    <ellipse cx="620" cy="620" rx="260" ry="200" fill="url(#moonShade)"/>
+  </g>
+
+  <g filter="url(#haze)" opacity="0.95">
+    <ellipse cx="690" cy="700" rx="390" ry="210" fill="url(#mistDeep)" transform="rotate(-18 690 700)"/>
+    <ellipse cx="360" cy="640" rx="300" ry="140" fill="url(#mistSoft)" transform="rotate(12 360 640)"/>
+  </g>
+  <g filter="url(#hazeTight)">
+    <ellipse cx="560" cy="560" rx="250" ry="78" fill="url(#mistWisp)" transform="rotate(-24 560 560)"/>
+    <ellipse cx="470" cy="690" rx="280" ry="70" fill="url(#mistWisp)" transform="rotate(-8 470 690)" opacity="0.85"/>
+  </g>
+
+  <g>
+    <circle cx="168" cy="188" r="22" fill="url(#starHalo)"/>
+    <circle cx="168" cy="188" r="3.2" fill="#ffffff"/>
+    <circle cx="846" cy="236" r="28" fill="url(#starHalo)"/>
+    <circle cx="846" cy="236" r="4.2" fill="#fffaf6"/>
+    <circle cx="900" cy="612" r="16" fill="url(#starHalo)"/>
+    <circle cx="900" cy="612" r="2.4" fill="#f3e8ff"/>
+    <circle cx="150" cy="760" r="20" fill="url(#starHalo)"/>
+    <circle cx="150" cy="760" r="3" fill="#ffffff"/>
+    <circle cx="760" cy="860" r="14" fill="url(#starHalo)"/>
+    <circle cx="760" cy="860" r="2.2" fill="#efe6ff"/>
+    <circle cx="720" cy="140" r="1.8" fill="#e7d6ff" opacity="0.8"/>
+    <circle cx="120" cy="520" r="1.6" fill="#ffffff" opacity="0.65"/>
+    <circle cx="930" cy="400" r="1.5" fill="#ffffff" opacity="0.55"/>
+  </g>
+</svg>
