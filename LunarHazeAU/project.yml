@@ -1,13 +1,13 @@
-# XcodeGen spec for the CosmicFlux AUv3 (iOS).
+# XcodeGen spec for the Lunar Haze AUv3 (iOS).
 #
 #   brew install xcodegen
-#   cd CosmicFluxAU && xcodegen generate && open CosmicFluxAU.xcodeproj
+#   cd LunarHazeAU && xcodegen generate && open LunarHazeAU.xcodeproj
 #
 # Then set your Team under Signing & Capabilities for BOTH targets
-# (CosmicFluxHost and CosmicFluxAU) and, if the bundle identifiers collide with
+# (LunarHazeHost and LunarHazeAU) and, if the bundle identifiers collide with
 # an existing app on your account, change the prefix below; the extension's
 # identifier must stay prefixed by the app's identifier.
-name: CosmicFluxAU
+name: LunarHazeAU
 options:
   bundleIdPrefix: com.pmsorhaindo
   deploymentTarget:
@@ -30,23 +30,23 @@ settings:
       SWIFT_OPTIMIZATION_LEVEL: "-O"
 
 targets:
-  CosmicFluxHost:
+  LunarHazeHost:
     type: application
     platform: iOS
     sources:
       - path: App
     settings:
       base:
-        PRODUCT_NAME: CosmicFlux
-        PRODUCT_BUNDLE_IDENTIFIER: com.pmsorhaindo.cosmicflux
+        PRODUCT_NAME: "Lunar Haze"
+        PRODUCT_BUNDLE_IDENTIFIER: com.pmsorhaindo.lunarhaze
         INFOPLIST_FILE: App/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks"
     dependencies:
-      - target: CosmicFluxAU
+      - target: LunarHazeAU
         embed: true
 
-  CosmicFluxAU:
+  LunarHazeAU:
     type: app-extension
     platform: iOS
     sources:
@@ -54,10 +54,10 @@ targets:
       - path: dsp
     settings:
       base:
-        PRODUCT_NAME: CosmicFluxAU
-        PRODUCT_BUNDLE_IDENTIFIER: com.pmsorhaindo.cosmicflux.auv3
+        PRODUCT_NAME: LunarHazeAU
+        PRODUCT_BUNDLE_IDENTIFIER: com.pmsorhaindo.lunarhaze.auv3
         INFOPLIST_FILE: Extension/Info.plist
-        SWIFT_OBJC_BRIDGING_HEADER: Extension/CosmicFluxAU-Bridging-Header.h
+        SWIFT_OBJC_BRIDGING_HEADER: Extension/LunarHazeAU-Bridging-Header.h
         SKIP_INSTALL: "YES"
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
         APPLICATION_EXTENSION_API_ONLY: "YES"

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Basic syntax validation for CosmicFlux instrument
+Basic syntax validation for the Lunar Haze instrument
 
 Checks for common Csound syntax issues without requiring Csound to be installed.
 """
@@ -13,7 +13,7 @@ INSTR_FILE = Path(__file__).parent.parent / "cosmicflux.instr"
 def validate_instrument():
     """Perform basic syntax validation"""
     
-    print("Validating CosmicFlux instrument syntax...")
+    print("Validating Lunar Haze instrument syntax...")
     print(f"File: {INSTR_FILE}")
     
     with open(INSTR_FILE, 'r') as f:

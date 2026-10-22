@@ -1,4 +1,4 @@
-#import "CosmicFluxAudioUnit.h"
+#import "LunarHazeAudioUnit.h"
 
 #import <AVFoundation/AVFoundation.h>
 
@@ -8,29 +8,29 @@
 #include <memory>
 #include <vector>
 
-#include "../dsp/CosmicFluxDSP.h"
-#include "../dsp/CosmicFluxParams.h"
+#include "../dsp/LunarHazeDSP.h"
+#include "../dsp/LunarHazeParams.h"
 
-using cosmicflux::CosmicFluxDSP;
-using cosmicflux::ParamInfo;
-using cosmicflux::ParamKind;
-using cosmicflux::kNumParams;
+using lunarhaze::LunarHazeDSP;
+using lunarhaze::ParamInfo;
+using lunarhaze::ParamKind;
+using lunarhaze::kNumParams;
 
-static NSString *const kStateKey = @"com.pmsorhaindo.cosmicflux.parameters";
+static NSString *const kStateKey = @"com.pmsorhaindo.lunarhaze.parameters";
 
 #pragma mark - Host value <-> normalised value
 
 // Hosts see indexed parameters as 0..steps-1 and everything else as 0..1.
 static inline float normalizedFromHostValue(int id, AUValue v) {
-    const ParamInfo &info = cosmicflux::paramInfo(id);
-    if (info.kind == ParamKind::Indexed) return cosmicflux::normalizedFromIndex(id, (int)lrintf(v));
+    const ParamInfo &info = lunarhaze::paramInfo(id);
+    if (info.kind == ParamKind::Indexed) return lunarhaze::normalizedFromIndex(id, (int)lrintf(v));
     if (info.kind == ParamKind::Toggle || info.kind == ParamKind::Momentary) return v > 0.5f ? 1.0f : 0.0f;
     return v;
 }
 
 static inline AUValue hostValueFromNormalized(int id, float n) {
-    const ParamInfo &info = cosmicflux::paramInfo(id);
-    if (info.kind == ParamKind::Indexed) return (AUValue)cosmicflux::indexFromNormalized(id, n);
+    const ParamInfo &info = lunarhaze::paramInfo(id);
+    if (info.kind == ParamKind::Indexed) return (AUValue)lunarhaze::indexFromNormalized(id, n);
     if (info.kind == ParamKind::Toggle || info.kind == ParamKind::Momentary) return n > 0.5f ? 1.0f : 0.0f;
     return n;
 }
@@ -40,7 +40,7 @@ static inline AUValue hostValueFromNormalized(int id, float n) {
 // Everything the render block touches lives here, reached through a raw pointer
 // so the block never retains or messages Objective-C objects.
 struct RenderState {
-    CosmicFluxDSP *dsp = nullptr;
+    LunarHazeDSP *dsp = nullptr;
     AUAudioFrameCount maxFrames = 0;
     std::vector<float> scratchL, scratchR;
     std::atomic<bool> bypass{false};
@@ -98,12 +98,12 @@ static const NSInteger kNumPresets = sizeof(kPresets) / sizeof(kPresets[0]);
 
 #pragma mark - Audio unit
 
-@interface CosmicFluxAudioUnit ()
+@interface LunarHazeAudioUnit ()
 @property (nonatomic, readwrite) AUParameterTree *parameterTree;
 @end
 
-@implementation CosmicFluxAudioUnit {
-    std::unique_ptr<CosmicFluxDSP> _dsp;
+@implementation LunarHazeAudioUnit {
+    std::unique_ptr<LunarHazeDSP> _dsp;
     std::unique_ptr<RenderState> _state;
     AUAudioUnitBus *_inputBus;
     AUAudioUnitBus *_outputBus;
@@ -122,7 +122,7 @@ static const NSInteger kNumPresets = sizeof(kPresets) / sizeof(kPresets[0]);
     self = [super initWithComponentDescription:componentDescription options:options error:outError];
     if (self == nil) return nil;
 
-    _dsp = std::make_unique<CosmicFluxDSP>();
+    _dsp = std::make_unique<LunarHazeDSP>();
     _dsp->prepare(48000.0);
     _state = std::make_unique<RenderState>();
     _state->dsp = _dsp.get();
@@ -146,7 +146,7 @@ static const NSInteger kNumPresets = sizeof(kPresets) / sizeof(kPresets[0]);
 - (void)buildParameterTree {
     NSMutableArray<AUParameter *> *params = [NSMutableArray arrayWithCapacity:kNumParams];
     for (int i = 0; i < kNumParams; ++i) {
-        const ParamInfo &info = cosmicflux::paramInfo(i);
+        const ParamInfo &info = lunarhaze::paramInfo(i);
         AudioUnitParameterOptions flags = kAudioUnitParameterFlag_IsReadable | kAudioUnitParameterFlag_IsWritable;
         AudioUnitParameterUnit unit = kAudioUnitParameterUnit_Generic;
         AUValue minV = 0.0f, maxV = 1.0f;
@@ -183,7 +183,7 @@ static const NSInteger kNumPresets = sizeof(kPresets) / sizeof(kPresets[0]);
     }
     _parameterTree = [AUParameterTree createTreeWithChildren:params];
 
-    CosmicFluxDSP *dsp = _dsp.get();
+    LunarHazeDSP *dsp = _dsp.get();
     _parameterTree.implementorValueObserver = ^(AUParameter *param, AUValue value) {
         dsp->setParam((int)param.address, normalizedFromHostValue((int)param.address, value));
     };
@@ -192,7 +192,7 @@ static const NSInteger kNumPresets = sizeof(kPresets) / sizeof(kPresets[0]);
     };
     _parameterTree.implementorStringFromValueCallback = ^NSString *(AUParameter *param, const AUValue *__nullable valuePtr) {
         AUValue v = valuePtr ? *valuePtr : param.value;
-        const ParamInfo &info = cosmicflux::paramInfo((int)param.address);
+        const ParamInfo &info = lunarhaze::paramInfo((int)param.address);
         switch (info.kind) {
             case ParamKind::Indexed: {
                 int idx = (int)lrintf(v);
@@ -256,7 +256,7 @@ static const NSInteger kNumPresets = sizeof(kPresets) / sizeof(kPresets[0]);
 
 - (AUInternalRenderBlock)internalRenderBlock {
     RenderState *state = _state.get();
-    CosmicFluxDSP *dsp = _dsp.get();
+    LunarHazeDSP *dsp = _dsp.get();
 
     return ^AUAudioUnitStatus(AudioUnitRenderActionFlags *actionFlags,
                               const AudioTimeStamp *timestamp,
@@ -323,7 +323,7 @@ static const NSInteger kNumPresets = sizeof(kPresets) / sizeof(kPresets[0]);
     if (state == nil) state = [NSMutableDictionary dictionary];
     NSMutableDictionary *values = [NSMutableDictionary dictionaryWithCapacity:kNumParams];
     for (int i = 0; i < kNumParams; ++i) {
-        values[@(cosmicflux::paramInfo(i).identifier)] = @(_dsp->getParam(i));
+        values[@(lunarhaze::paramInfo(i).identifier)] = @(_dsp->getParam(i));
     }
     state[kStateKey] = values;
     return state;

@@ -1,4 +1,4 @@
-# CosmicFlux Test Results
+# Lunar Haze Test Results
 
 ## Test Environment
 

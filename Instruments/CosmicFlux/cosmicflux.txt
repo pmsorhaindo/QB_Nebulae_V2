@@ -1,7 +1,7 @@
 -------------------------------------------------
-COSMICFLUX v0.1
+LUNAR HAZE v0.1
 -------------------------------------------------
-CosmicFlux is a multi-stage delay and reverb effect instrument for the 
+Lunar Haze is a multi-stage delay and reverb effect instrument for the 
 Qu-Bit Nebulae V2, inspired by cascaded rack delays and massive reverberant 
 spaces.
 
@@ -100,7 +100,7 @@ Tips & Tricks
 -------------------------------------------------
 CPU & Performance Notes
 -------------------------------------------------
-CosmicFlux v0.1 is designed to run on Raspberry Pi 3 (Cortex-A53) at:
+Lunar Haze v0.1 is designed to run on Raspberry Pi 3 (Cortex-A53) at:
   - sr = 48000 Hz
   - ksmps = 64 samples
   - Buffer = 1024 samples
@@ -132,7 +132,7 @@ To reset all alt controls to defaults: hold SOURCE, then click PITCH encoder.
 -------------------------------------------------
 Credits & License
 -------------------------------------------------
-CosmicFlux v0.1
+Lunar Haze v0.1
 Created 2026 for the Qu-Bit Nebulae V2
 Instrument concept: Michael Sorhaindo
 

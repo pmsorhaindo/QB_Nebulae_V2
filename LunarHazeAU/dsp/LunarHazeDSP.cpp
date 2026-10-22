@@ -1,9 +1,9 @@
-#include "CosmicFluxDSP.h"
+#include "LunarHazeDSP.h"
 
 #include <algorithm>
 #include <cmath>
 
-namespace cosmicflux {
+namespace lunarhaze {
 
 namespace {
 
@@ -149,16 +149,16 @@ void Phaser2::clear() {
 }  // namespace detail
 
 // ---------------------------------------------------------------------------
-// CosmicFluxDSP
+// LunarHazeDSP
 // ---------------------------------------------------------------------------
-CosmicFluxDSP::CosmicFluxDSP() {
+LunarHazeDSP::LunarHazeDSP() {
     for (int i = 0; i < kNumParams; ++i) {
         params_[i].store(paramInfo(i).defaultValue, std::memory_order_relaxed);
         p_[i] = paramInfo(i).defaultValue;
     }
 }
 
-void CosmicFluxDSP::prepare(double sampleRate) {
+void LunarHazeDSP::prepare(double sampleRate) {
     sr_ = sampleRate > 1000.0 ? sampleRate : 48000.0;
 
     // Flux chain: stage delay <= 2.0 s / 6 plus modulation (< 2 ms)
@@ -213,7 +213,7 @@ void CosmicFluxDSP::prepare(double sampleRate) {
     reset(true);
 }
 
-void CosmicFluxDSP::reset(bool snapSmoothers) {
+void LunarHazeDSP::reset(bool snapSmoothers) {
     for (auto& d : fluxL_) d.clear();
     for (auto& d : fluxR_) d.clear();
     for (auto& d : fdn_) d.clear();
@@ -260,17 +260,17 @@ void CosmicFluxDSP::reset(bool snapSmoothers) {
     samplesUntilTick_ = kControlBlock;
 }
 
-void CosmicFluxDSP::setParam(int id, float normalized) {
+void LunarHazeDSP::setParam(int id, float normalized) {
     if (id < 0 || id >= kNumParams) return;
     params_[id].store(clampf(normalized, 0.0f, 1.0f), std::memory_order_relaxed);
 }
 
-float CosmicFluxDSP::getParam(int id) const {
+float LunarHazeDSP::getParam(int id) const {
     if (id < 0 || id >= kNumParams) return 0.0f;
     return params_[id].load(std::memory_order_relaxed);
 }
 
-void CosmicFluxDSP::snapAllSmoothers() {
+void LunarHazeDSP::snapAllSmoothers() {
     for (int i = 0; i < kNumParams; ++i) p_[i] = params_[i].load(std::memory_order_relaxed);
     const bool freeze = p_[pFreeze] > 0.5f;
 
@@ -331,7 +331,7 @@ void CosmicFluxDSP::snapAllSmoothers() {
 // ---------------------------------------------------------------------------
 // Control rate (every 64 samples)
 // ---------------------------------------------------------------------------
-void CosmicFluxDSP::controlTick() {
+void LunarHazeDSP::controlTick() {
     for (int i = 0; i < kNumParams; ++i) p_[i] = params_[i].load(std::memory_order_relaxed);
     const float sr = static_cast<float>(sr_);
     const float c002 = static_cast<float>(coef002_), c005 = static_cast<float>(coef005_);
@@ -484,7 +484,7 @@ void CosmicFluxDSP::controlTick() {
 // ---------------------------------------------------------------------------
 // Audio rate
 // ---------------------------------------------------------------------------
-void CosmicFluxDSP::process(const float* inL, const float* inR, float* outL, float* outR, int numFrames) {
+void LunarHazeDSP::process(const float* inL, const float* inR, float* outL, float* outR, int numFrames) {
     if (!prepared_) {
         for (int i = 0; i < numFrames; ++i) { outL[i] = inL[i]; outR[i] = inR[i]; }
         return;
@@ -503,7 +503,7 @@ void CosmicFluxDSP::process(const float* inL, const float* inR, float* outL, flo
     }
 }
 
-void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* outL, float* outR, int n) {
+void LunarHazeDSP::renderSamples(const float* inL, const float* inR, float* outL, float* outR, int n) {
     const float sr = static_cast<float>(sr_);
     const bool mute = p_[pMuteInput] > 0.5f;
     const bool freeze = freeze_;
@@ -688,4 +688,4 @@ void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* out
     }
 }
 
-}  // namespace cosmicflux
+}  // namespace lunarhaze
