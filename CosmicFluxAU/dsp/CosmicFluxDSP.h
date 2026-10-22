@@ -47,6 +47,36 @@ struct Smoother {
     float y = 0.0f;
 };
 
+// Per-sample linear ramp for smooth parameter changes within a control block.
+struct LinearRamp {
+    void setTarget(float target, int rampSamples) {
+        t = target;
+        if (rampSamples > 0) {
+            inc = (t - current) / static_cast<float>(rampSamples);
+            remaining = rampSamples;
+        } else {
+            current = t;
+            inc = 0.0f;
+            remaining = 0;
+        }
+    }
+    inline float next() {
+        if (remaining > 0) {
+            current += inc;
+            --remaining;
+            if (remaining == 0) current = t;
+        }
+        return current;
+    }
+    inline float value() const { return current; }
+    void snap(float v) { current = v; t = v; inc = 0.0f; remaining = 0; }
+    
+    float current = 0.0f;
+    float t = 0.0f;
+    float inc = 0.0f;
+    int remaining = 0;
+};
+
 // tone / atone (Csound first-order filters, half-power cutoff).
 struct OnePole {
     void setCutoff(double hz, double sr);
@@ -191,6 +221,7 @@ private:
     float followDepth_ = 0.0f;
     detail::Smoother flangerDepthPort_;
     float flangerDepth_ = 0.0f;
+    detail::LinearRamp flangerDepthRamp_;
     float flangerMix_ = 0.0f;
     float flangerFeedback_ = 0.7f;
     int flangerMode_ = 1;
@@ -204,17 +235,22 @@ private:
     // Flux chain
     detail::Smoother moonTimePort_;
     float moonDelayTime_ = 0.4f;
+    detail::LinearRamp moonDelayRamp_;
     float stageTimeSamples_ = 0.0f;
+    detail::LinearRamp stageTimeSamplesRamp_;
     std::array<double, 6> fluxLfoPhase_{}, fluxLfoInc_{};
     std::array<float, 6> fluxLfoAmpSamples_{};
     detail::Smoother dimensionPort_;
     float stageGain_ = 1.0f;
+    detail::LinearRamp stageGainRamp_;
     detail::Smoother feedbackFilterPort_;
     float lpAmount_ = 0.0f, hpAmount_ = 0.0f;
+    detail::LinearRamp lpAmountRamp_, hpAmountRamp_;
     detail::OnePole fluxLpL_, fluxLpR_, fluxHpL_, fluxHpR_;
     detail::DcBlock2 fluxDcL_, fluxDcR_;
     detail::Smoother moonFeedbackPort_;
     float moonFeedback_ = 0.0f;
+    detail::LinearRamp moonFeedbackRamp_;
     std::array<detail::DelayLine, 6> fluxL_, fluxR_;
     detail::BlockDelay fluxFbDelayL_, fluxFbDelayR_;
     detail::Smoother multiplyPort_;
@@ -233,10 +269,13 @@ private:
     bool freeze_ = false;
     int cosmosMode_ = 0;
     float cosmosFeedback_ = 0.0f, density_ = 0.0f;
+    detail::LinearRamp cosmosFeedbackRamp_, densityRamp_;
     std::array<float, 8> fdnDelaySamples_{};
     std::array<uint32_t, 8> fdnDelayInt_{};
+    std::array<detail::LinearRamp, 8> fdnDelayRamps_;
     std::array<double, 8> fdnLfoPhase_{}, fdnLfoIncPerSample_{};
     float fdnModAmpSamples_ = 0.0f;
+    detail::LinearRamp fdnModAmpRamp_;
     std::array<detail::DelayLine, 8> fdn_;
     std::array<float, 8> fdnState_{};
     std::array<detail::OnePole, 8> fdnModeFilter_;
@@ -247,10 +286,13 @@ private:
     // Output
     detail::Smoother mixPort_;
     float mixWet_ = 0.0f, mixDry_ = 1.0f;
+    detail::LinearRamp mixWetRamp_, mixDryRamp_;
     float wetCompensation_ = 1.0f;
+    detail::LinearRamp wetCompensationRamp_;
     float blockPeak_ = 0.0f;
     detail::Smoother limiterPort_;
     float limiterGain_ = 1.0f;
+    detail::LinearRamp limiterGainRamp_;
 };
 
 }  // namespace cosmicflux

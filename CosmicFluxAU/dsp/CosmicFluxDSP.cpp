@@ -275,23 +275,57 @@ void CosmicFluxDSP::snapAllSmoothers() {
     const bool freeze = p_[pFreeze] > 0.5f;
 
     flangerDepthPort_.y = p_[pFlangerDepth] * 0.01f;
+    flangerDepthRamp_.snap(flangerDepthPort_.y);
     float raw = csoundScale(p_[pTime], 1.19f, 0.01f);
     moonTimePort_.y = raw * raw;
+    moonDelayRamp_.snap(moonTimePort_.y);
     dimensionPort_.y = p_[pDimension] * 0.8f;
+    // Unity-gain chain: Dimension drives modulation depth, not stage attenuation.
+    stageGainRamp_.snap(1.0f);
     feedbackFilterPort_.y = p_[pFeedbackFilter];
+    float lpSnap = feedbackFilterPort_.y < 0.5f ? (0.5f - feedbackFilterPort_.y) * 2.0f : 0.0f;
+    float hpSnap = feedbackFilterPort_.y > 0.5f ? (feedbackFilterPort_.y - 0.5f) * 2.0f : 0.0f;
+    lpAmountRamp_.snap(lpSnap);
+    hpAmountRamp_.snap(hpSnap);
     moonFeedbackPort_.y = p_[pFeedback] * 0.98f;
+    moonFeedbackRamp_.snap(moonFeedbackPort_.y);
     multiplyPort_.y = static_cast<float>(static_cast<int>(p_[pMultiply] * 5.99f) + 1);
     phaserOnPort_.y = p_[pPhaser] > 0.5f ? 1.0f : 0.0f;
     float vnorm = (p_[pCosmosDelay] - 0.6f) * 5.0f;
     cosmosDelayPort_.y = clampf(0.25f * std::pow(2.0f, -vnorm), 0.06f, 2.0f);
     warpPort_.y = p_[pCosmosWarp];
     cosmosFeedbackPort_.y = freeze ? 1.0f : p_[pCosmosFeedback] * 0.995f;
+    cosmosFeedbackRamp_.snap(cosmosFeedbackPort_.y);
     densityPort_.y = freeze ? 1.0f : p_[pCosmosDensity];
+    densityRamp_.snap(densityPort_.y);
     float modDepth = freeze ? 0.0f : csoundScale(p_[pCosmosMod], 0.008f, 0.0f);
     modDepthPort_.y = modDepth;
     modRatePort_.y = (freeze || modDepth <= 0.0f) ? 0.0f : std::sqrt(modDepth) * 2.0f;
+    fdnModAmpRamp_.snap(modDepthPort_.y * static_cast<float>(sr_));
     mixPort_.y = p_[pMix];
+    float mixWetSnap = std::sin(mixPort_.y * 1.5708f);
+    float mixDrySnap = std::cos(mixPort_.y * 1.5708f);
+    mixWetRamp_.snap(mixWetSnap);
+    mixDryRamp_.snap(mixDrySnap);
     limiterPort_.y = 1.0f;
+    limiterGainRamp_.snap(1.0f);
+    
+    // Snap stage time and FDN delay ramps
+    float mult = p_[pHalfSpeed] > 0.5f ? 0.5f : 1.0f;
+    if (p_[pDottedEighth] > 0.5f) mult *= 1.5f;
+    float moonSnap = clampf(moonTimePort_.y * mult, 0.01f, 2.0f);
+    float stageTimeSnap = moonSnap / 6.0f * static_cast<float>(sr_);
+    stageTimeSamplesRamp_.snap(stageTimeSnap);
+    float timeCompensation = 1.0f + (1.0f - clampf(moonSnap / 0.5f, 0.0f, 1.0f)) * 0.5f;
+    float tapCompensation = 1.0f + (1.0f - multiplyPort_.y / 6.0f) * 0.15f;
+    wetCompensationRamp_.snap(timeCompensation * tapCompensation);
+    
+    static const float kRatios[8] = {1.0f, 0.887f, 0.781f, 0.693f, 0.613f, 0.541f, 0.479f, 0.421f};
+    for (int i = 0; i < 8; ++i) {
+        float lenSec = cosmosDelayPort_.y * (1.0f - warpPort_.y * (1.0f - kRatios[i]));
+        float delaySnap = lenSec * static_cast<float>(sr_) + static_cast<float>(kControlBlock);
+        fdnDelayRamps_[i].snap(delaySnap);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +340,7 @@ void CosmicFluxDSP::controlTick() {
     // ---- [A] flanger ----
     flangerMode_ = static_cast<int>(p_[pFlangerMode] * 2.99f);
     flangerDepth_ = flangerDepthPort_.process(p_[pFlangerDepth] * 0.01f, c01);
+    flangerDepthRamp_.setTarget(flangerDepth_, kControlBlock);
     flangerFeedback_ = p_[pFlangerNegFB] > 0.5f ? -0.7f : 0.7f;
     flangerMix_ = flangerDepth_ > 0.0f ? 0.5f : 0.0f;
     flangerLfoInc_ = 0.5 / sr_;
@@ -328,12 +363,15 @@ void CosmicFluxDSP::controlTick() {
     float mult = p_[pHalfSpeed] > 0.5f ? 0.5f : 1.0f;
     if (p_[pDottedEighth] > 0.5f) mult *= 1.5f;
     moonDelayTime_ = clampf(moonPort * mult, 0.01f, 2.0f);
+    moonDelayRamp_.setTarget(moonDelayTime_, kControlBlock);
     float stageTime = moonDelayTime_ / 6.0f;
     stageTimeSamples_ = stageTime * sr;
+    stageTimeSamplesRamp_.setTarget(stageTimeSamples_, kControlBlock);
 
     float dim = dimensionPort_.process(p_[pDimension] * 0.8f, c01);
     // Unity-gain cascaded stages: dimension controls modulation depth and cross-coupling, not gain
     stageGain_ = 1.0f;
+    stageGainRamp_.setTarget(stageGain_, kControlBlock);
 
     float earlyRate = csoundScale(p_[pEarlyMod], 0.5f, 0.01f);
     float earlyDepth = earlyRate * 0.002f;
@@ -353,6 +391,8 @@ void CosmicFluxDSP::controlTick() {
     float fbf = feedbackFilterPort_.process(p_[pFeedbackFilter], c01);
     lpAmount_ = fbf < 0.5f ? (0.5f - fbf) * 2.0f : 0.0f;
     hpAmount_ = fbf > 0.5f ? (fbf - 0.5f) * 2.0f : 0.0f;
+    lpAmountRamp_.setTarget(lpAmount_, kControlBlock);
+    hpAmountRamp_.setTarget(hpAmount_, kControlBlock);
     if (lpAmount_ > 0.0f) {
         double hz = 2000.0 + lpAmount_ * 8000.0;
         fluxLpL_.setCutoff(hz, sr_);
@@ -364,6 +404,7 @@ void CosmicFluxDSP::controlTick() {
         fluxHpR_.setCutoff(hz, sr_);
     }
     moonFeedback_ = moonFeedbackPort_.process(p_[pFeedback] * 0.98f, c01);
+    moonFeedbackRamp_.setTarget(moonFeedback_, kControlBlock);
 
     float multInt = static_cast<float>(static_cast<int>(p_[pMultiply] * 5.99f) + 1);
     multiply_ = multiplyPort_.process(multInt, c005);
@@ -399,12 +440,15 @@ void CosmicFluxDSP::controlTick() {
         // Csound writes the previous block's feedback vector, adding ksmps of loop latency.
         fdnDelaySamples_[i] = lenSec * sr + static_cast<float>(kControlBlock);
         fdnDelayInt_[i] = static_cast<uint32_t>(lenSec * sr + 0.5f) + kControlBlock;
+        fdnDelayRamps_[i].setTarget(fdnDelaySamples_[i], kControlBlock);
     }
 
     float fbRaw = freeze_ ? 1.0f : p_[pCosmosFeedback] * 0.995f;
     float fbPort = cosmosFeedbackPort_.process(fbRaw, c01);
     cosmosFeedback_ = freeze_ ? 1.0f : fbPort;
+    cosmosFeedbackRamp_.setTarget(cosmosFeedback_, kControlBlock);
     density_ = densityPort_.process(freeze_ ? 1.0f : p_[pCosmosDensity], c01);
+    densityRamp_.setTarget(density_, kControlBlock);
     cosmosMode_ = static_cast<int>(p_[pCosmosMode] * 3.99f);
 
     float modDepthRaw = csoundScale(p_[pCosmosMod], 0.008f, 0.0f);
@@ -413,21 +457,27 @@ void CosmicFluxDSP::controlTick() {
     float modDepthP = modDepthPort_.process(modDepth, c01);
     float modRateP = modRatePort_.process(modRate, c01);
     fdnModAmpSamples_ = modDepthP * sr;
+    fdnModAmpRamp_.setTarget(fdnModAmpSamples_, kControlBlock);
     for (int i = 0; i < 8; ++i) fdnLfoIncPerSample_[i] = modRateP / sr_;
 
     // ---- output ----
     float mix = mixPort_.process(p_[pMix], c01);
     mixWet_ = std::sin(mix * 1.5708f);
     mixDry_ = std::cos(mix * 1.5708f);
-    
+    mixWetRamp_.setTarget(mixWet_, kControlBlock);
+    mixDryRamp_.setTarget(mixDry_, kControlBlock);
+
     // Dynamic wet compensation: shorter delays and fewer taps need more boost
-    // to compensate for increased filter passes and less feedback buildup
+    // to compensate for increased filter passes and less feedback buildup.
+    // Ramped per sample so a delay-time or tap-count change does not click.
     float timeCompensation = 1.0f + (1.0f - clampf(moonDelayTime_ / 0.5f, 0.0f, 1.0f)) * 0.5f;
     float tapCompensation = 1.0f + (1.0f - multiply_ / 6.0f) * 0.15f;
     wetCompensation_ = timeCompensation * tapCompensation;
+    wetCompensationRamp_.setTarget(wetCompensation_, kControlBlock);
 
     float gainTarget = blockPeak_ > 0.85f ? 0.85f / blockPeak_ : 1.0f;
     limiterGain_ = limiterPort_.process(gainTarget, c002);
+    limiterGainRamp_.setTarget(limiterGain_, kControlBlock);
     blockPeak_ = 0.0f;
 }
 
@@ -458,16 +508,31 @@ void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* out
     const bool mute = p_[pMuteInput] > 0.5f;
     const bool freeze = freeze_;
     const int mode = cosmosMode_;
-    const float density2over8 = density_ * 0.25f;
-    const float fbGain2 = cosmosFeedback_ * 2.0f;
-    const float massiveInputGain = freeze ? 0.0f : 1.0f;
-    const float xf = phaserXfade_;
-    const float xfInv = 1.0f - xf;
-    const float phDepth = phaserDepth_;
-    const float phDryGain = 1.0f - phDepth * 0.5f;
     constexpr float kAntiDenorm = 1.0e-18f;
 
     for (int i = 0; i < n; ++i) {
+        // Per-sample parameter ramping for smooth changes
+        const float stageTimeSamplesSmooth = stageTimeSamplesRamp_.next();
+        const float stageGainSmooth = stageGainRamp_.next();
+        const float lpAmountSmooth = lpAmountRamp_.next();
+        const float hpAmountSmooth = hpAmountRamp_.next();
+        const float moonFeedbackSmooth = moonFeedbackRamp_.next();
+        const float cosmosFeedbackSmooth = cosmosFeedbackRamp_.next();
+        const float densitySmooth = densityRamp_.next();
+        const float density2over8 = densitySmooth * 0.25f;
+        const float fbGain2 = cosmosFeedbackSmooth * 2.0f;
+        const float fdnModAmpSmooth = fdnModAmpRamp_.next();
+        const float mixWetSmooth = mixWetRamp_.next();
+        const float mixDrySmooth = mixDryRamp_.next();
+        const float limiterGainSmooth = limiterGainRamp_.next();
+        const float wetCompensationSmooth = wetCompensationRamp_.next();
+        
+        const float massiveInputGain = freeze ? 0.0f : 1.0f;
+        const float xf = phaserXfade_;
+        const float xfInv = 1.0f - xf;
+        const float phDepth = phaserDepth_;
+        const float phDryGain = 1.0f - phDepth * 0.5f;
+        
         float l = mute ? 0.0f : inL[i] * 0.95f;
         float r = mute ? 0.0f : inR[i] * 0.95f;
 
@@ -476,15 +541,17 @@ void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* out
         if (samplesUntilTick_ == kControlBlock && i == 0) followDepth_ = env;  // k(aFollow)
         double flLfo = std::sin(kTwoPi * flangerLfoPhase_);
         flangerLfoPhase_ = wrapPhase(flangerLfoPhase_ + flangerLfoInc_);
+        float flangerDepthSmooth = flangerDepthRamp_.next();
         float modSec;
-        if (flangerMode_ == 0) modSec = (1.0f - followDepth_) * flangerDepth_;
-        else if (flangerMode_ == 1) modSec = followDepth_ * flangerDepth_;
-        else modSec = static_cast<float>(flLfo) * flangerDepth_;
+        if (flangerMode_ == 0) modSec = (1.0f - followDepth_) * flangerDepthSmooth;
+        else if (flangerMode_ == 1) modSec = followDepth_ * flangerDepthSmooth;
+        else modSec = static_cast<float>(flLfo) * flangerDepthSmooth;
         float modSamples = modSec * sr;
         float flL = flangerL_.process(l, modSamples, flangerFeedback_);
         float flR = flangerR_.process(r, modSamples, flangerFeedback_);
-        float sigL = flL * flangerMix_ + l * (1.0f - flangerMix_);
-        float sigR = flR * flangerMix_ + r * (1.0f - flangerMix_);
+        float flangerMixSmooth = flangerDepthSmooth > 0.0f ? 0.5f : 0.0f;
+        float sigL = flL * flangerMixSmooth + l * (1.0f - flangerMixSmooth);
+        float sigR = flR * flangerMixSmooth + r * (1.0f - flangerMixSmooth);
 
         // ---- [B] Flux Chain: 6 series stages ----
         // The feedback written into stage 1 is the value computed one Csound
@@ -500,27 +567,27 @@ void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* out
         for (int s = 0; s < 6; ++s) {
             float lfo = static_cast<float>(triLfo(fluxLfoPhase_[s])) * fluxLfoAmpSamples_[s];
             fluxLfoPhase_[s] = wrapPhase(fluxLfoPhase_[s] + fluxLfoInc_[s]);
-            float d = stageTimeSamples_ + lfo;
+            float d = stageTimeSamplesSmooth + lfo;
             float tL = fluxL_[s].readCubic(d);
             float tR = fluxR_[s].readCubic(d);
             fluxL_[s].write(xL + kAntiDenorm);
             fluxR_[s].write(xR + kAntiDenorm);
-            stagesL[s] = tL * stageGain_;
-            stagesR[s] = tR * stageGain_;
+            stagesL[s] = tL * stageGainSmooth;
+            stagesR[s] = tR * stageGainSmooth;
             xL = stagesL[s];
             xR = stagesR[s];
         }
 
         // feedback path: tilt filter, saturation, dc block, gain
         float f6L = stagesL[5], f6R = stagesR[5];
-        if (lpAmount_ > 0.0f) { f6L = fluxLpL_.lp(f6L); f6R = fluxLpR_.lp(f6R); }
-        if (hpAmount_ > 0.0f) { f6L = fluxHpL_.hp(f6L); f6R = fluxHpR_.hp(f6R); }
+        if (lpAmountSmooth > 0.0f) { f6L = fluxLpL_.lp(f6L); f6R = fluxLpR_.lp(f6R); }
+        if (hpAmountSmooth > 0.0f) { f6L = fluxHpL_.hp(f6L); f6R = fluxHpR_.hp(f6R); }
         f6L = std::tanh(f6L * 2.0f) * 0.5f;
         f6R = std::tanh(f6R * 2.0f) * 0.5f;
         f6L = fluxDcL_.process(f6L);
         f6R = fluxDcR_.process(f6R);
-        fluxFbDelayL_.buf[fbPos] = f6L * moonFeedback_;
-        fluxFbDelayR_.buf[fbPos] = f6R * moonFeedback_;
+        fluxFbDelayL_.buf[fbPos] = f6L * moonFeedbackSmooth;
+        fluxFbDelayR_.buf[fbPos] = f6R * moonFeedbackSmooth;
 
         // multiply: tap mix with alternating pans
         static const float panL[6] = {0.7f, 0.3f, 0.6f, 0.4f, 0.5f, 0.5f};
@@ -564,9 +631,10 @@ void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* out
             if (freeze) {
                 taps[k] = fdn_[k].readInt(fdnDelayInt_[k]);
             } else {
-                float lfo = static_cast<float>(std::sin(kTwoPi * fdnLfoPhase_[k])) * fdnModAmpSamples_;
+                float lfo = static_cast<float>(std::sin(kTwoPi * fdnLfoPhase_[k])) * fdnModAmpSmooth;
                 fdnLfoPhase_[k] = wrapPhase(fdnLfoPhase_[k] + fdnLfoIncPerSample_[k]);
-                taps[k] = fdn_[k].readCubic(fdnDelaySamples_[k] + lfo);
+                float delaySmooth = fdnDelayRamps_[k].next();
+                taps[k] = fdn_[k].readCubic(delaySmooth + lfo);
             }
         }
         taps[0] += mInL; taps[1] += mInR; taps[2] += mInL; taps[3] += mInR;
@@ -595,19 +663,19 @@ void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* out
         }
         // Energy-normalized FDN output: 4 taps per channel
         // Base compensation (2.4x) plus dynamic compensation for parameter-dependent losses
-        float totalCompensation = 2.4f * wetCompensation_;
+        float totalCompensation = 2.4f * wetCompensationSmooth;
         float massiveL = (fdnState_[0] + fdnState_[2] + fdnState_[4] + fdnState_[6]) * totalCompensation;
         float massiveR = (fdnState_[1] + fdnState_[3] + fdnState_[5] + fdnState_[7]) * totalCompensation;
         massiveL = outHpL_.hp(outLpL_.lp(massiveL));
         massiveR = outHpR_.hp(outLpR_.lp(massiveR));
 
-        // ---- output: mix, limiter, gentle soft clip ----
-        float oL = sigL * mixDry_ + massiveL * mixWet_;
-        float oR = sigR * mixDry_ + massiveR * mixWet_;
+        // ---- output: ramped mix and limiter, unity-gain soft clip ----
+        float oL = sigL * mixDrySmooth + massiveL * mixWetSmooth;
+        float oR = sigR * mixDrySmooth + massiveR * mixWetSmooth;
         float pk = std::max(std::fabs(oL), std::fabs(oR));
         if (pk > blockPeak_) blockPeak_ = pk;
-        oL *= limiterGain_;
-        oR *= limiterGain_;
+        oL *= limiterGainSmooth;
+        oR *= limiterGainSmooth;
         // Gentle soft knee starting at 0.7, unity gain at output
         oL = softClip095(oL);
         oR = softClip095(oR);
