@@ -247,6 +247,7 @@ private:
     // Output
     detail::Smoother mixPort_;
     float mixWet_ = 0.0f, mixDry_ = 1.0f;
+    float wetCompensation_ = 1.0f;
     float blockPeak_ = 0.0f;
     detail::Smoother limiterPort_;
     float limiterGain_ = 1.0f;

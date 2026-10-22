@@ -419,6 +419,12 @@ void CosmicFluxDSP::controlTick() {
     float mix = mixPort_.process(p_[pMix], c01);
     mixWet_ = std::sin(mix * 1.5708f);
     mixDry_ = std::cos(mix * 1.5708f);
+    
+    // Dynamic wet compensation: shorter delays and fewer taps need more boost
+    // to compensate for increased filter passes and less feedback buildup
+    float timeCompensation = 1.0f + (1.0f - clampf(moonDelayTime_ / 0.5f, 0.0f, 1.0f)) * 0.5f;
+    float tapCompensation = 1.0f + (1.0f - multiply_ / 6.0f) * 0.15f;
+    wetCompensation_ = timeCompensation * tapCompensation;
 
     float gainTarget = blockPeak_ > 0.85f ? 0.85f / blockPeak_ : 1.0f;
     limiterGain_ = limiterPort_.process(gainTarget, c002);
@@ -588,9 +594,10 @@ void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* out
             fdn_[k].write(v + kAntiDenorm);
         }
         // Energy-normalized FDN output: 4 taps per channel
-        // Compensate for filter losses, FDN diffusion, and maintain wet level near unity
-        float massiveL = (fdnState_[0] + fdnState_[2] + fdnState_[4] + fdnState_[6]) * 2.4f;
-        float massiveR = (fdnState_[1] + fdnState_[3] + fdnState_[5] + fdnState_[7]) * 2.4f;
+        // Base compensation (2.4x) plus dynamic compensation for parameter-dependent losses
+        float totalCompensation = 2.4f * wetCompensation_;
+        float massiveL = (fdnState_[0] + fdnState_[2] + fdnState_[4] + fdnState_[6]) * totalCompensation;
+        float massiveR = (fdnState_[1] + fdnState_[3] + fdnState_[5] + fdnState_[7]) * totalCompensation;
         massiveL = outHpL_.hp(outLpL_.lp(massiveL));
         massiveR = outHpR_.hp(outLpR_.lp(massiveR));
 
