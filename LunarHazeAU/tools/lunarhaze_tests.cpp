@@ -230,7 +230,7 @@ int main() {
 
         bool allWithinRange = true;
         for (const auto& tc : cases) {
-            CosmicFluxDSP d;
+            LunarHazeDSP d;
             d.prepare(sr);
             d.reset(true);
             d.setParam(pMix, 1.0f);  // 100% wet to test wet path only
@@ -250,7 +250,7 @@ int main() {
     // ---- 7. parameter smoothing: no large discontinuities on abrupt changes ----
     {
         const int sr = 48000;
-        CosmicFluxDSP d;
+        LunarHazeDSP d;
         d.prepare(sr);
         setBusyParams(d);
         d.reset(true);
