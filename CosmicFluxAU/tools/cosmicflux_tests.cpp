@@ -200,6 +200,52 @@ int main() {
         check(peak < 1e-6, "silence in gives silence out");
     }
 
-    std::printf("%s (%d failure%s)\n", gFailures == 0 ? "ALL PASSED" : "FAILED", gFailures, gFailures == 1 ? "" : "s");
+    // ---- 6. RMS level matching across parameter sweeps ----
+    {
+        const int sr = 48000;
+        const double duration = 2.0;
+        std::vector<float> l, r;
+        makeTestSignal(l, r, sr, duration);
+        double inputRms = rmsDb(l, r);
+        std::printf("\n  Input RMS: %.2f dBFS\n", inputRms);
+
+        struct TestCase { const char* name; int param; float value; };
+        const TestCase cases[] = {
+            {"Dimension=0.0", pDimension, 0.0f},
+            {"Dimension=0.5", pDimension, 0.5f},
+            {"Dimension=1.0", pDimension, 1.0f},
+            {"Time=0.2", pTime, 0.2f},
+            {"Time=0.8", pTime, 0.8f},
+            {"Feedback=0.0", pFeedback, 0.0f},
+            {"Feedback=0.7", pFeedback, 0.7f},
+            {"Multiply=1", pMultiply, 0.0f},
+            {"Multiply=6", pMultiply, 1.0f},
+            {"CosmosDelay=0.3", pCosmosDelay, 0.3f},
+            {"CosmosDelay=0.9", pCosmosDelay, 0.9f},
+            {"Density=0.0", pCosmosDensity, 0.0f},
+            {"Density=1.0", pCosmosDensity, 1.0f},
+            {"Phaser=off", pPhaser, 0.0f},
+            {"Phaser=on", pPhaser, 1.0f},
+        };
+
+        bool allWithinRange = true;
+        for (const auto& tc : cases) {
+            CosmicFluxDSP d;
+            d.prepare(sr);
+            d.reset(true);
+            d.setParam(pMix, 1.0f);  // 100% wet to test wet path only
+            d.setParam(tc.param, tc.value);
+            std::vector<float> ol(l.size()), orr(r.size());
+            renderWithBlocks(d, l, r, ol, orr, {256});
+            double wetRms = rmsDb(ol, orr);
+            double diff = wetRms - inputRms;
+            std::printf("  %-18s wet RMS: %6.2f dBFS, diff: %+.2f dB\n", tc.name, wetRms, diff);
+            // Allow ±3 dB tolerance (accounts for filtering, FDN decay, etc.)
+            if (std::fabs(diff) > 3.5) allWithinRange = false;
+        }
+        check(allWithinRange, "wet output RMS stays within ±3.5 dB of input across parameter sweeps");
+    }
+
+    std::printf("\n%s (%d failure%s)\n", gFailures == 0 ? "ALL PASSED" : "FAILED", gFailures, gFailures == 1 ? "" : "s");
     return gFailures == 0 ? 0 : 1;
 }

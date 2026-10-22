@@ -331,21 +331,24 @@ void CosmicFluxDSP::controlTick() {
     float stageTime = moonDelayTime_ / 6.0f;
     stageTimeSamples_ = stageTime * sr;
 
+    float dim = dimensionPort_.process(p_[pDimension] * 0.8f, c01);
+    // Unity-gain cascaded stages: dimension controls modulation depth and cross-coupling, not gain
+    stageGain_ = 1.0f;
+
     float earlyRate = csoundScale(p_[pEarlyMod], 0.5f, 0.01f);
     float earlyDepth = earlyRate * 0.002f;
     float lateRate = csoundScale(p_[pLateMod], 1.0f, 0.01f);
     float lateDepth = lateRate * 0.002f;
-    const float amps[6] = {earlyDepth, earlyDepth * 0.8f, earlyDepth * 0.6f,
-                           lateDepth * 0.6f, lateDepth * 0.8f, lateDepth};
+    // Scale modulation depth by dimension for smearing effect
+    float dimScale = 1.0f + dim * 2.0f;
+    const float amps[6] = {earlyDepth * dimScale, earlyDepth * 0.8f * dimScale, earlyDepth * 0.6f * dimScale,
+                           lateDepth * 0.6f * dimScale, lateDepth * 0.8f * dimScale, lateDepth * dimScale};
     const float rates[6] = {earlyRate, earlyRate * 1.1f, earlyRate * 1.2f,
                             lateRate * 0.9f, lateRate * 1.0f, lateRate * 1.1f};
     for (int i = 0; i < 6; ++i) {
         fluxLfoAmpSamples_[i] = amps[i] * sr;
         fluxLfoInc_[i] = rates[i] / sr_;
     }
-
-    float dim = dimensionPort_.process(p_[pDimension] * 0.8f, c01);
-    stageGain_ = (1.0f - dim) / (1.0f + std::fabs(dim));
 
     float fbf = feedbackFilterPort_.process(p_[pFeedbackFilter], c01);
     lpAmount_ = fbf < 0.5f ? (0.5f - fbf) * 2.0f : 0.0f;
@@ -584,20 +587,23 @@ void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* out
             fdnState_[k] = v;
             fdn_[k].write(v + kAntiDenorm);
         }
-        float massiveL = (fdnState_[0] + fdnState_[2] + fdnState_[4] + fdnState_[6]) * 1.2f;
-        float massiveR = (fdnState_[1] + fdnState_[3] + fdnState_[5] + fdnState_[7]) * 1.2f;
+        // Energy-normalized FDN output: 4 taps per channel
+        // Compensate for filter losses, FDN diffusion, and maintain wet level near unity
+        float massiveL = (fdnState_[0] + fdnState_[2] + fdnState_[4] + fdnState_[6]) * 2.4f;
+        float massiveR = (fdnState_[1] + fdnState_[3] + fdnState_[5] + fdnState_[7]) * 2.4f;
         massiveL = outHpL_.hp(outLpL_.lp(massiveL));
         massiveR = outHpR_.hp(outLpR_.lp(massiveR));
 
-        // ---- output: mix, limiter, soft clip, makeup ----
+        // ---- output: mix, limiter, gentle soft clip ----
         float oL = sigL * mixDry_ + massiveL * mixWet_;
         float oR = sigR * mixDry_ + massiveR * mixWet_;
         float pk = std::max(std::fabs(oL), std::fabs(oR));
         if (pk > blockPeak_) blockPeak_ = pk;
         oL *= limiterGain_;
         oR *= limiterGain_;
-        oL = softClip095(oL) * 1.2f;
-        oR = softClip095(oR) * 1.2f;
+        // Gentle soft knee starting at 0.7, unity gain at output
+        oL = softClip095(oL);
+        oR = softClip095(oR);
         outL[i] = oL;
         outR[i] = oR;
 
