@@ -345,7 +345,10 @@ void CosmicFluxDSP::controlTick() {
     }
 
     float dim = dimensionPort_.process(p_[pDimension] * 0.8f, c01);
-    stageGain_ = (1.0f - dim) / (1.0f + std::fabs(dim));
+    // Raw per-stage gain compounds over 6 series stages (about -34 dB at the
+    // last tap with Dimension 40%). Take the cube root so the chain decays
+    // gently (about -12 dB at the last tap) while keeping the same shape.
+    stageGain_ = std::cbrt((1.0f - dim) / (1.0f + std::fabs(dim)));
 
     float fbf = feedbackFilterPort_.process(p_[pFeedbackFilter], c01);
     lpAmount_ = fbf < 0.5f ? (0.5f - fbf) * 2.0f : 0.0f;
@@ -523,8 +526,9 @@ void CosmicFluxDSP::renderSamples(const float* inL, const float* inR, float* out
                 moonR += stagesR[s] * panR[s];
             }
         }
-        moonL *= tapGain_;
-        moonR *= tapGain_;
+        // Makeup so the Flux Chain sits near the dry level (+6 dB).
+        moonL *= tapGain_ * 2.0f;
+        moonR *= tapGain_ * 2.0f;
 
         // ---- [C] dual barberpole phaser ----
         float pL1 = phaserL1_.process(moonL);
