@@ -21,7 +21,7 @@ struct ContentView: View {
                 Text("Delay and reverb, AUv3 audio effect")
                     .foregroundColor(.secondary)
                 Divider()
-                Text("The plug-in is installed. Open AUM, add an audio effect to a channel and choose \"Sorhaindo: Lunar Haze\" under Audio Unit Effects.")
+                Text("The plug-in is installed. Open AUM, add an audio effect to a channel and choose \"MyyQii: Lunar Haze\" under Audio Unit Effects.")
                 Text("Signal flow: dynamic flanger, Flux Chain (6-stage modulated series delay), dual barberpole phaser, Cosmos (8-line feedback delay network), mix and limiter.")
                 Text("All controls are exposed as Audio Unit parameters, so AUM can map MIDI and record automation. Freeze holds the Cosmos network indefinitely.")
                 Text("Nothing in this app processes audio; keep it installed so the extension stays available.")

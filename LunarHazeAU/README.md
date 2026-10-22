@@ -185,7 +185,7 @@ phone, and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
 
 6. In AUM: tap "+" to add a channel, pick an input (Audio Input for a mic or
    interface, or a File Player), then tap the "+" below it in the Effects slot,
-   choose "Audio Unit Effects" and pick "Sorhaindo: Lunar Haze". Tap the node to
+   choose "Audio Unit Effects" and pick "MyyQii: Lunar Haze". Tap the node to
    open the plug-in UI, or use AUM's own parameter view. MIDI mapping and
    automation work through AUM's standard parameter mapping (long-press a
    control in AUM's parameter view, or use the MIDI Control page). Saving the
